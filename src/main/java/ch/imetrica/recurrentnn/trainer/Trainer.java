@@ -17,6 +17,7 @@ import ch.imetrica.recurrentnn.datastructs.DataStep;
 import ch.imetrica.recurrentnn.loss.Loss;
 import ch.imetrica.recurrentnn.matrix.Matrix;
 import ch.imetrica.recurrentnn.model.Model;
+import ch.imetrica.recurrentnn.model.NeuralNetwork;
 import jcuda.Pointer;
 import jcuda.driver.CUfunction;
 import jcuda.driver.CUmodule;
@@ -32,10 +33,10 @@ public class Trainer {
 	public static CUfunction function;
 	
 	
-	public double decayRate = 0.999;
-	public double smoothEpsilon = 1e-8;
-	public double gradientClipValue = 5;
-	public double regularization = 0.000001; 
+	public static double decayRate = 0.999;
+	public static double smoothEpsilon = 1e-8;
+	public static double gradientClipValue = 5;
+	public static double regularization = 0.000001; 
 	
 	
 	public Trainer()
@@ -43,7 +44,7 @@ public class Trainer {
 	    prepare();
 	}
 	
-	public void prepare()
+	public static void prepare()
     {
         String ptxFileName = null;
         try
@@ -64,11 +65,11 @@ public class Trainer {
     }
 	
 	
-	public static double train(int trainingEpochs, double learningRate, Model model, DataSet data, int reportEveryNthEpoch, Random rng) throws Exception {
+	public static double train(int trainingEpochs, double learningRate, NeuralNetwork model, DataSet data, int reportEveryNthEpoch, Random rng) throws Exception {
 		return train(trainingEpochs, learningRate, model, data, reportEveryNthEpoch, false, false, null, rng);
 	}
 	
-	public static double train(int trainingEpochs, double learningRate, Model model, DataSet data, int reportEveryNthEpoch, boolean initFromSaved, boolean overwriteSaved, String savePath, Random rng) throws Exception {
+	public static double train(int trainingEpochs, double learningRate, NeuralNetwork model, DataSet data, int reportEveryNthEpoch, boolean initFromSaved, boolean overwriteSaved, String savePath, Random rng) throws Exception {
 		System.out.println("--------------------------------------------------------------");
 		if (initFromSaved) {
 			System.out.println("initializing model from saved state...");
@@ -128,25 +129,36 @@ public class Trainer {
 		return result;
 	}
 	
-	public static double pass(double learningRate, Model model, List<DataSequence> sequences, boolean applyTraining, Loss lossTraining, Loss lossReporting) throws Exception {
+	public static double pass(double learningRate, NeuralNetwork model, List<DataSequence> sequences, boolean applyTraining, Loss lossTraining, Loss lossReporting) throws Exception {
 		
 		double numerLoss = 0;
 		double denomLoss = 0;
 		
+		Graph g = new Graph(applyTraining);
+		
 		for (DataSequence seq : sequences) {
+			
 			model.resetState();
-			Graph g = new Graph(applyTraining);
+			g.emptyBackpropQueue();
 			for (DataStep step : seq.steps) {
-				Matrix output = model.forward(step.input, g);				
+				
+				model.forward_ff(step.input, g);
+										
 				if (step.targetOutput != null) {
-					double loss = lossReporting.measure(output, step.targetOutput);
+					
+					double loss = lossReporting.measure(model.getOutput(), step.targetOutput);	
+					
+
+									
 					if (Double.isNaN(loss) || Double.isInfinite(loss)) {
 						return loss;
 					}
 					numerLoss += loss;
 					denomLoss++;			
 					if (applyTraining) {
-						lossTraining.backward(output, step.targetOutput);
+						
+						lossTraining.backward(model.getOutput(), step.targetOutput);
+
 					}
 				}
 			}

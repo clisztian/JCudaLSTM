@@ -9,6 +9,7 @@ import java.util.Random;
 import ch.imetrica.recurrentnn.datasets.EmbeddedReberGrammar;
 import ch.imetrica.recurrentnn.datastructs.DataSet;
 import ch.imetrica.recurrentnn.model.Model;
+import ch.imetrica.recurrentnn.model.NeuralNetwork;
 import ch.imetrica.recurrentnn.trainer.Trainer;
 import ch.imetrica.recurrentnn.util.NeuralNetworkConstructor;
 import jcuda.jcurand.curandGenerator;
@@ -21,8 +22,10 @@ public class ExampleEmbeddedReberGrammar {
 		curandGenerator rng = new curandGenerator();
         curandCreateGenerator(rng, CURAND_RNG_PSEUDO_DEFAULT);
         curandSetPseudoRandomGeneratorSeed(rng, 1234);
-		
-        Random r = new Random();
+	
+     
+        
+        Random r = new Random();		
         
 		DataSet data = new EmbeddedReberGrammar(r);
 		
@@ -31,7 +34,7 @@ public class ExampleEmbeddedReberGrammar {
 		double learningRate = 0.001;
 		double initParamsStdDev = 0.08;
 
-		Model nn = NeuralNetworkConstructor.makeLstm( 
+		NeuralNetwork nn = NeuralNetworkConstructor.makeLstm( 
 				data.inputDimension, 
 				hiddenDimension, 1, hiddenLayers, 
 				data.outputDimension, data.getModelOutputUnitToUse(), 
@@ -40,6 +43,7 @@ public class ExampleEmbeddedReberGrammar {
 		int reportEveryNthEpoch = 10;
 		int trainingEpochs = 1000;
 		
+		Trainer.prepare();
 		Trainer.train(trainingEpochs, learningRate, nn, data, reportEveryNthEpoch, r);
 		
 		System.out.println("done.");

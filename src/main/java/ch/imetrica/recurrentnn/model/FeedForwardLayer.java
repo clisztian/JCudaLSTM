@@ -32,7 +32,6 @@ import jcuda.Pointer;
 import jcuda.Sizeof;
 import jcuda.driver.CUfunction;
 import jcuda.driver.CUmodule;
-import jcuda.jcublas.JCublas;
 import jcuda.jcurand.curandGenerator;
 import jcuda.nvrtc.nvrtcProgram;
 
@@ -286,7 +285,7 @@ public class FeedForwardLayer implements Model {
 		double numerLoss = 0;
 		double denomLoss = 0;
 		
-		double stepSize = .001; 
+		double stepSize = .005; 
 		double decayRate = 0.999;
 		double smoothEpsilon = 1e-8;
 		double gradientClipValue = 5;
@@ -294,7 +293,7 @@ public class FeedForwardLayer implements Model {
 		double intStdDev = 0.08;
 		
 		int inputDimension = 1;
-		int hiddenDimension = 20;
+		int hiddenDimension = 50;
 		int hiddenLayers = 1; 
 		int outputDimension = 1; 
 		boolean applyTraining = true;
@@ -608,4 +607,15 @@ public class FeedForwardLayer implements Model {
 	   }
 		
     }
+
+	@Override
+	public void forward_ff(Matrix input, Graph g) throws Exception {
+         
+	}
+	
+
+	@Override
+	public Matrix getOutput() {
+		return outnonlin;
+	}
 }

@@ -99,6 +99,7 @@ public class LstmLayer implements Model {
 	public LstmLayer(int inputDimension, int outputDimension, int inputCols, double initParamsStdDev, curandGenerator rng, int seed) {
 		
 		curandSetPseudoRandomGeneratorSeed(rng, seed);
+		prepareCuda();
 		
 		this.inputDimension = inputDimension;
 		this.outputDimension = outputDimension;
@@ -119,6 +120,9 @@ public class LstmLayer implements Model {
 		Wcx = Matrix.rand(outputDimension, inputDimension, initParamsStdDev, rng);
 		Wch = Matrix.rand(outputDimension, outputDimension, initParamsStdDev, rng);
 		bc = new Matrix(outputDimension);
+		
+		hiddenContext = Matrix.zeros(outputDimension, inputCols);
+		cellContext = Matrix.zeros(outputDimension, inputCols);
 		
 		setupOutMatrices();
 	}
@@ -201,9 +205,23 @@ public class LstmLayer implements Model {
 		cellContext.copy(cellAct);		
 	}
 		
+	@Override
+    public void forward_ff(Matrix input, Graph g) throws Exception {
+		
+//    	nn.layers.get(0).static_forward(input, g);
+//    	
+//		for (int i = 1; i < nn.layers.size(); i++) {
+//			nn.layers.get(i).static_forward(nn.layers.get(i-1).getOutput(), g);
+//		}
+	}
 
 
-
+    @Override
+    public Matrix getOutput()
+    {
+    	return output;
+    }
+    
 	public void setupOutMatrices() {
 		
 		
@@ -231,12 +249,12 @@ public class LstmLayer implements Model {
 		outadd7 = Matrix.zeros(outadd6.rows, bc.cols);
 		cellInput = Matrix.zeros(outadd7.rows, outadd7.cols);	
 		
+		outnonlin = Matrix.zeros(outinputGate.rows, outinputGate.cols);
 		retainCell = Matrix.zeros(cellInput.rows, cellInput.cols);
 		writeCell = Matrix.zeros(cellInput.rows, cellInput.cols);
 		cellAct = Matrix.zeros(writeCell.rows, writeCell.cols);
-				
-		hiddenContext = Matrix.zeros(writeCell.rows, writeCell.cols);
-		cellContext = Matrix.zeros(cellAct.rows, cellAct.cols);
+		
+		output = Matrix.zeros(outputGate.rows, outputGate.cols);
 		
 	}
 	
@@ -294,7 +312,7 @@ public class LstmLayer implements Model {
 	@Override
 	public void resetState() {
 		resetToZero(hiddenContext); 
-		resetToZero(cellContext); 
+		resetToZero(cellContext); 	
 	}
 
 	@Override
@@ -362,8 +380,6 @@ public class LstmLayer implements Model {
 		writeCell.destroyMatrix();
 		cellAct.destroyMatrix();
 				
-		hiddenContext.destroyMatrix();
-		cellContext.destroyMatrix();
 		
 	}
 	

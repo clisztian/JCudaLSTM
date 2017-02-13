@@ -57,5 +57,21 @@ public class NeuralNetwork implements Model {
 		}
 		return result;
 	}
+
+	@Override
+	public Matrix getOutput() {
+		return layers.get(layers.size() - 1).getOutput();
+	}
+
+	@Override
+	public void forward_ff(Matrix input, Graph g) throws Exception {
+		
+        layers.get(0).static_forward(input, g);
+    	
+		for (int i = 1; i < layers.size(); i++) {
+			layers.get(i).static_forward(layers.get(i-1).getOutput(), g);
+		}
+		
+	}
 }
 

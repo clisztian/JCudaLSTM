@@ -16,6 +16,11 @@ import jcuda.jcurand.curandGenerator;
 
 public class EmbeddedReberGrammar extends DataSet {
 	
+	/**
+	 * 
+	 */
+	private static final long serialVersionUID = 1L;
+
 	static public class State {
 		public State(Transition[] transitions) {
 			this.transitions = transitions;

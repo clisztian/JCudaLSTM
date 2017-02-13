@@ -30,6 +30,20 @@ public class LinearLayer implements Model {
 		
 	}
 	
+
+	@Override
+    public void forward_ff(Matrix input, Graph g) throws Exception {
+		
+	}
+
+
+    @Override
+    public Matrix getOutput()
+    {
+    	return null;
+    }
+	
+	
 	@Override
 	public void resetState() {
 

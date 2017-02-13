@@ -73,6 +73,18 @@ public class GruLayer implements Model {
 		
 	}
 	
+	
+	@Override
+	public void forward_ff(Matrix input, Graph g) throws Exception {
+         	
+	}
+	
+
+	@Override
+	public Matrix getOutput() {
+		return context;
+	}
+	
 
 	@Override
 	public void resetState() {

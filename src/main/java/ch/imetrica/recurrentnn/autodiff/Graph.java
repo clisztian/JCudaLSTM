@@ -168,7 +168,7 @@ public class Graph {
         // Print the compilation log (for the case there are any warnings)
         programLog = new String[1];
         nvrtcGetProgramLog(program, programLog);
-        System.out.println("Nonlinear Backprob Program compilation log:\n" + programLog[0]); 
+        System.out.println("Nonlinear Backprob Program compilation log me:\n" + programLog[0]); 
     	    	
         // Obtain the PTX ("CUDA Assembler") code of the compiled program
         ptx = new String[1];
