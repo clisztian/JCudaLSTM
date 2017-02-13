@@ -26,6 +26,12 @@ public class NeuralNetwork implements Model {
 		return prev;
 	}
 
+	@Override
+	public void static_forward(Matrix input, Graph g) throws Exception 
+	{
+		
+	}
+	
 	
 //	public void static_forward(Matrix input, Graph g, Matrix out) throws Exception {
 //		Matrix prev = input;

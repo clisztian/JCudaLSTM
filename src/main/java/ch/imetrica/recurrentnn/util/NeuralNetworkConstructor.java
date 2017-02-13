@@ -18,48 +18,48 @@ public class NeuralNetworkConstructor {
 	
 	
 	
-	public static NeuralNetwork makeLstm(int inputDimension, int hiddenDimension, int hiddenLayers, int outputDimension, Nonlinearity decoderUnit, double initParamsStdDev, curandGenerator rng) {
+	public static NeuralNetwork makeLstm(int inputDimension, int hiddenDimension, int inputCols, int hiddenLayers, int outputDimension, Nonlinearity decoderUnit, double initParamsStdDev, curandGenerator rng) {
 		List<Model> layers = new ArrayList<>();
 		for (int h = 0; h < hiddenLayers; h++) {
 			if (h == 0) {
-				layers.add(new LstmLayer(inputDimension, hiddenDimension, initParamsStdDev, rng));
+				layers.add(new LstmLayer(inputDimension, hiddenDimension, inputCols, initParamsStdDev, rng, h));
 			}
 			else {
-				layers.add(new LstmLayer(hiddenDimension, hiddenDimension, initParamsStdDev, rng));
+				layers.add(new LstmLayer(hiddenDimension, hiddenDimension, inputCols, initParamsStdDev, rng, h));
 			}
 		}
 		layers.add(new FeedForwardLayer(hiddenDimension, outputDimension, decoderUnit, initParamsStdDev, rng, hiddenLayers+1));
 		return new NeuralNetwork(layers);
 	}
 	
-	public static NeuralNetwork makeLstmWithInputBottleneck(int inputDimension, int bottleneckDimension, int hiddenDimension, int hiddenLayers, int outputDimension, Nonlinearity decoderUnit, double initParamsStdDev, curandGenerator rng) {
+	public static NeuralNetwork makeLstmWithInputBottleneck(int inputDimension, int bottleneckDimension, int hiddenDimension, int inputCols, int hiddenLayers, int outputDimension, Nonlinearity decoderUnit, double initParamsStdDev, curandGenerator rng) {
 		List<Model> layers = new ArrayList<>();
 		layers.add(new LinearLayer(inputDimension, bottleneckDimension, initParamsStdDev, rng));
 		for (int h = 0; h < hiddenLayers; h++) {
 			if (h == 0) {
-				layers.add(new LstmLayer(bottleneckDimension, hiddenDimension, initParamsStdDev, rng));
+				layers.add(new LstmLayer(bottleneckDimension, hiddenDimension, inputCols, initParamsStdDev, rng, h+1));
 			}
 			else {
-				layers.add(new LstmLayer(hiddenDimension, hiddenDimension, initParamsStdDev, rng));
+				layers.add(new LstmLayer(hiddenDimension, hiddenDimension, inputCols, initParamsStdDev, rng, h+1));
 			}
 		}
-		layers.add(new FeedForwardLayer(hiddenDimension, outputDimension, decoderUnit, initParamsStdDev, rng, hiddenLayers + 1));
+		layers.add(new FeedForwardLayer(hiddenDimension, outputDimension, decoderUnit, initParamsStdDev, rng, hiddenLayers + 2));
 		return new NeuralNetwork(layers);
 	}
 	
 	public static NeuralNetwork makeFeedForward(int inputDimension, int hiddenDimension, int hiddenLayers, int outputDimension, Nonlinearity hiddenUnit, Nonlinearity decoderUnit, double initParamsStdDev, curandGenerator rng) {
 		List<Model> layers = new ArrayList<>();
 		if (hiddenLayers == 0) {
-			layers.add(new FeedForwardLayer(inputDimension, outputDimension, decoderUnit, initParamsStdDev, rng, hiddenLayers + 1));
+			layers.add(new FeedForwardLayer(inputDimension, outputDimension, decoderUnit, initParamsStdDev, rng, 0));
 			return new NeuralNetwork(layers);
 		}
 		else {
 			for (int h = 0; h < hiddenLayers; h++) {
 				if (h == 0) {
-					layers.add(new FeedForwardLayer(inputDimension, hiddenDimension, hiddenUnit, initParamsStdDev, rng, hiddenLayers + 1));
+					layers.add(new FeedForwardLayer(inputDimension, hiddenDimension, hiddenUnit, initParamsStdDev, rng, h + 1));
 				}
 				else {
-					layers.add(new FeedForwardLayer(hiddenDimension, hiddenDimension, hiddenUnit, initParamsStdDev, rng, hiddenLayers + 1));
+					layers.add(new FeedForwardLayer(hiddenDimension, hiddenDimension, hiddenUnit, initParamsStdDev, rng, h + 1));
 				}
 			}
 			layers.add(new FeedForwardLayer(hiddenDimension, outputDimension, decoderUnit, initParamsStdDev, rng, hiddenLayers + 1));

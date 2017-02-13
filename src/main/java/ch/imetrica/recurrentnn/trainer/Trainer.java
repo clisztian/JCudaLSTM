@@ -28,8 +28,8 @@ import jcuda.driver.CUmodule;
 public class Trainer {
 	
 	
-	private CUmodule module; 
-	private CUfunction function;
+	public static CUmodule module; 
+	public static CUfunction function;
 	
 	
 	public double decayRate = 0.999;
@@ -64,11 +64,11 @@ public class Trainer {
     }
 	
 	
-	public double train(int trainingEpochs, double learningRate, Model model, DataSet data, int reportEveryNthEpoch, Random rng) throws Exception {
+	public static double train(int trainingEpochs, double learningRate, Model model, DataSet data, int reportEveryNthEpoch, Random rng) throws Exception {
 		return train(trainingEpochs, learningRate, model, data, reportEveryNthEpoch, false, false, null, rng);
 	}
 	
-	public double train(int trainingEpochs, double learningRate, Model model, DataSet data, int reportEveryNthEpoch, boolean initFromSaved, boolean overwriteSaved, String savePath, Random rng) throws Exception {
+	public static double train(int trainingEpochs, double learningRate, Model model, DataSet data, int reportEveryNthEpoch, boolean initFromSaved, boolean overwriteSaved, String savePath, Random rng) throws Exception {
 		System.out.println("--------------------------------------------------------------");
 		if (initFromSaved) {
 			System.out.println("initializing model from saved state...");
@@ -128,7 +128,7 @@ public class Trainer {
 		return result;
 	}
 	
-	public double pass(double learningRate, Model model, List<DataSequence> sequences, boolean applyTraining, Loss lossTraining, Loss lossReporting) throws Exception {
+	public static double pass(double learningRate, Model model, List<DataSequence> sequences, boolean applyTraining, Loss lossTraining, Loss lossReporting) throws Exception {
 		
 		double numerLoss = 0;
 		double denomLoss = 0;
@@ -161,14 +161,14 @@ public class Trainer {
 	}
 	
 	
-	public void updateModelParams(Model model, double stepSize) throws Exception {
+	public static void updateModelParams(Model model, double stepSize) throws Exception {
 		for (Matrix m : model.getParameters()) {
 			
 			updateModelParams(m.size, stepSize, m.w, m.dw, m.stepCache);			
 		}
 	}
 	
-	private void updateModelParams(int n, double stepSize, Pointer w, Pointer dw, Pointer cached)
+	private static void updateModelParams(int n, double stepSize, Pointer w, Pointer dw, Pointer cached)
 	{
 
 		    cuModuleGetFunction(function, module, "update_parameters");

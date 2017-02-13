@@ -25,6 +25,12 @@ public class LinearLayer implements Model {
 	}
 
 	@Override
+	public void static_forward(Matrix input, Graph g) throws Exception 
+	{
+		
+	}
+	
+	@Override
 	public void resetState() {
 
 	}

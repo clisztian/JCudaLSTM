@@ -33,6 +33,22 @@ __global__ void getTargetIndex(int n, int *index, double *w)
    }
 }
 
+
+extern "C"
+__global__ void mismatch(int n, double* actual, double *target, int *mis)
+{
+ 
+   mis[0] = 0;
+   
+   int i = blockIdx.x * blockDim.x + threadIdx.x;
+   if (i<n)
+   {
+     if(target[i] >= 0.5 && actual[i] < 0.5) {mis[0] = 1;}
+     if(target[i] < 0.5 && actual[i] >= 0.5) {mis[0] = 1;}
+   }
+}
+
+
 extern "C"
 __global__ void setTargetIndex(int n, double *w, double *out)
 {

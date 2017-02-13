@@ -43,6 +43,14 @@ public class RnnLayer implements Model {
 		return output;
 	}
 
+	
+	@Override
+	public void static_forward(Matrix input, Graph g) throws Exception 
+	{
+		
+	}
+	
+	
 	@Override
 	public void resetState() {
 		context = new Matrix(outputDimension);

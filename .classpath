@@ -5,17 +5,17 @@
 			<attribute name="FROM_GRADLE_MODEL" value="true"/>
 		</attributes>
 	</classpathentry>
+	<classpathentry kind="src" path="jars"/>
 	<classpathentry kind="src" path="src/test/java">
 		<attributes>
 			<attribute name="FROM_GRADLE_MODEL" value="true"/>
 		</attributes>
 	</classpathentry>
-	<classpathentry kind="src" path="cuda"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/JavaSE-1.8"/>
 	<classpathentry kind="con" path="org.eclipse.buildship.core.gradleclasspathcontainer"/>
-	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/JavaSE-1.8/"/>
-	<classpathentry kind="lib" path="jars/jcublas-0.8.0.jar" sourcepath="/home/smartsensor/jcuda/jcublas"/>
+	<classpathentry kind="lib" path="jars/jcublas-0.8.0.jar"/>
 	<classpathentry kind="lib" path="jars/jcublas-natives-0.8.0-linux-x86_64.jar"/>
-	<classpathentry kind="lib" path="jars/jcuda-0.8.0.jar" sourcepath="/home/smartsensor/jcuda/jcuda"/>
+	<classpathentry kind="lib" path="jars/jcuda-0.8.0.jar"/>
 	<classpathentry kind="lib" path="jars/jcuda-natives-0.8.0-linux-x86_64.jar"/>
 	<classpathentry kind="lib" path="jars/jcufft-0.8.0.jar"/>
 	<classpathentry kind="lib" path="jars/jcufft-natives-0.8.0-linux-x86_64.jar"/>

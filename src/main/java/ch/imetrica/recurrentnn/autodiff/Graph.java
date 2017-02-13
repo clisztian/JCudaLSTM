@@ -359,6 +359,22 @@ public class Graph {
 	}
 	
 	
+	public void elmul(final Matrix m1, final Matrix m2, final Matrix out) throws Exception {
+		if (m1.rows != m2.rows || m1.cols != m2.cols) {
+			throw new Exception("matrix dimension mismatch");
+		}
+			
+		elemult(out.size, m1.w, m2.w, out.w);
+
+		if (this.applyBackprop) {
+			Runnable bp = new Runnable() {
+				public void run() {
+					crossmult(out.size, m1.dw, m2.dw, m1.w, m2.w, out.dw);
+				}
+			};
+			backprop.add(bp);
+		}
+	}	
 
 	
 	
