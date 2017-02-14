@@ -14,7 +14,15 @@ import static jcuda.nvrtc.JNvrtc.nvrtcGetProgramLog;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
+
 import ch.imetrica.recurrentnn.autodiff.Graph;
+import ch.imetrica.recurrentnn.datasets.EmbeddedReberGrammar;
+import ch.imetrica.recurrentnn.datastructs.DataSequence;
+import ch.imetrica.recurrentnn.datastructs.DataSet;
+import ch.imetrica.recurrentnn.datastructs.DataStep;
+import ch.imetrica.recurrentnn.loss.Loss;
+import ch.imetrica.recurrentnn.loss.LossSumOfSquares;
 import ch.imetrica.recurrentnn.matrix.Matrix;
 import jcuda.Pointer;
 import jcuda.driver.CUfunction;
@@ -314,6 +322,15 @@ public class LstmLayer implements Model {
 		resetToZero(hiddenContext); 
 		resetToZero(cellContext); 	
 	}
+	
+	
+	public static void resetState(List<LstmLayer> layers)
+	{
+		for (Model layer : layers) {
+			layer.resetState();
+		}
+	}
+	
 
 	@Override
 	public List<Matrix> getParameters() {
@@ -382,6 +399,164 @@ public class LstmLayer implements Model {
 				
 		
 	}
+	
+	
+	public static List<Model> makeLstm(int inputDimension, int hiddenDimension, int inputCols, int hiddenLayers, int outputDimension, Nonlinearity decoderUnit, double initParamsStdDev, curandGenerator rng) {
+		
+		List<Model> layers = new ArrayList<>();
+		
+		for (int h = 0; h < hiddenLayers; h++) {
+			if (h == 0) {
+				layers.add(new LstmLayer(inputDimension, hiddenDimension, inputCols, initParamsStdDev, rng, h));
+			}
+			else {
+				layers.add(new LstmLayer(hiddenDimension, hiddenDimension, inputCols, initParamsStdDev, rng, h));
+			}
+		}
+		layers.add(new FeedForwardLayer(hiddenDimension, outputDimension, decoderUnit, initParamsStdDev, rng, hiddenLayers+1));
+		return layers;
+	}
+	
+	
+	
+	public void testLSTM(List<DataSequence> traindata, List<DataSequence> testdata, int number_epochs, curandGenerator rng) throws Exception
+	{
+		
+		double numerLoss = 0;
+		double denomLoss = 0;
+		
+		double stepSize = .005; 
+		double decayRate = 0.999;
+		double smoothEpsilon = 1e-8;
+		double gradientClipValue = 5;
+		double regularization = 0.000001; 
+		double intStdDev = 0.08;
+		
+		
+        Random r = new Random(32);		        
+		DataSet data = new EmbeddedReberGrammar(r);
+		
+		
+		int inputDimension = data.inputDimension;
+		int hiddenDimension = 12;
+		int hiddenLayers = 1; 
+		int outputDimension = data.outputDimension; 
+		boolean applyTraining = true;
+		
+		nvrtcProgram program = new nvrtcProgram();
+        nvrtcCreateProgram(program, updateSourceCode, null, 0, null, null);
+        nvrtcCompileProgram(program, 0, null);
+                
+        // Print the compilation log (for the case there are any warnings)
+        String[] programLog = new String[1];
+        nvrtcGetProgramLog(program, programLog);
+        System.out.println("Nonlinear Backprob Program compilation log:\n" + programLog[0]); 
+    	    	
+        // Obtain the PTX ("CUDA Assembler") code of the compiled program
+        String[] ptx = new String[1];
+        nvrtcGetPTX(program, ptx);
+        nvrtcDestroyProgram(program);
+
+        // Create a CUDA module from the PTX code
+        module = new CUmodule();
+        cuModuleLoadData(module, ptx[0]);
+
+        // Obtain the function pointer to the "add" function from the module
+        function = new CUfunction();				
+		
+		
+		Graph g = new Graph();
+		Nonlinearity hiddenUnit = new SigmoidUnit();
+        Nonlinearity fInputGate = new TanhUnit();
+
+		Loss lossReporting = new LossSumOfSquares();
+		Loss lossTraining = new LossSumOfSquares();
+		
+		List<Model> LSTMNet = makeLstm(inputDimension, hiddenDimension, 1, hiddenLayers, outputDimension,
+				 fInputGate, intStdDev, rng);
+				
+		
+		for(int i = 0; i < number_epochs; i++)
+		{
+		 
+		  numerLoss = 0;
+		  denomLoss = 0;		
+			
+		  for (DataSequence seq : traindata) {
+			
+			resetState(LSTMNet);
+			g.emptyBackpropQueue();
+			
+			for (DataStep step : seq.steps) {
+				
+				forward_ff(feedForwardNet, step.input, g);
+				
+				if (step.targetOutput != null) {
+					
+					double loss = lossReporting.measure(getOutput(feedForwardNet), step.targetOutput);					
+					if (Double.isNaN(loss) || Double.isInfinite(loss)) {
+						
+						throw new RuntimeException("Could not converge");
+						
+					}
+					
+					numerLoss += loss;
+					denomLoss++;			
+					if (applyTraining) {
+						lossTraining.backward(getOutput(feedForwardNet), step.targetOutput);
+					}
+				}
+			}
+
+			if (applyTraining) {
+				
+				g.backward(); 
+				updateModelParams(module, function, feedForwardNet, stepSize, decayRate, regularization, smoothEpsilon, gradientClipValue);
+			}	
+		  }
+		  if(i%10 == 0) {
+			  System.out.println("Epoch " + i + " average loss = " + numerLoss/denomLoss);
+		  }
+		}
+		
+		
+		
+		for (DataSequence seq : testdata) {
+				
+			resetState(feedForwardNet);
+			g.emptyBackpropQueue();
+			
+			for (DataStep step : seq.steps) {
+				
+				forward_ff(feedForwardNet, step.input, g);
+				
+				if (step.targetOutput != null) {
+					
+					double loss = lossReporting.measure(getOutput(feedForwardNet), step.targetOutput);					
+					if (Double.isNaN(loss) || Double.isInfinite(loss)) {
+						
+						throw new RuntimeException("Could not converge");
+						
+					}
+					
+					numerLoss += loss;
+					denomLoss++;			
+				}
+			}	
+		  }
+		  System.out.println("Test set average loss = " + numerLoss/denomLoss);
+		
+		
+	
+		
+		deleteNetwork(feedForwardNet);
+		
+		
+	}
+	
+	
+	
+	
 	
 	
 	
