@@ -232,7 +232,8 @@ public class Matrix implements Serializable {
         
         // Initiate dw and cache to 0 vectors
         zerosFromHost();
-        
+ 
+        //this.printMatrix();
 	}
 	
 	public Matrix(){
@@ -1190,17 +1191,18 @@ public class Matrix implements Serializable {
         double hostOutputW[] = new double[this.size];        
         cudaMemcpy(Pointer.to(hostOutputW), this.w,  this.size * Sizeof.DOUBLE, cudaMemcpyDeviceToHost);
         
-        double hostInput[] = new double[this.size];        
-        cudaMemcpy(Pointer.to(hostInput), this.dw,  this.size * Sizeof.DOUBLE, cudaMemcpyDeviceToHost);
-    	
-        double hostCached[] = new double[this.size];        
-        cudaMemcpy(Pointer.to(hostCached), this.stepCache,  this.size * Sizeof.DOUBLE, cudaMemcpyDeviceToHost);
+//        double hostInput[] = new double[this.size];        
+//        cudaMemcpy(Pointer.to(hostInput), this.dw,  this.size * Sizeof.DOUBLE, cudaMemcpyDeviceToHost);
+//    	
+//        double hostCached[] = new double[this.size];        
+//        cudaMemcpy(Pointer.to(hostCached), this.stepCache,  this.size * Sizeof.DOUBLE, cudaMemcpyDeviceToHost);
         
         for(int i = 0; i < this.size; i++)
         {
-        	System.out.println(i + " " + hostOutputW[i] + " " + hostInput[i] + " " + hostCached[i]);
+        	//System.out.println(i + " " + hostOutputW[i] + " " + hostInput[i] + " " + hostCached[i]);
+        	System.out.print(hostOutputW[i] + " ");
         }
-        
+        System.out.println("");
     }
     
     

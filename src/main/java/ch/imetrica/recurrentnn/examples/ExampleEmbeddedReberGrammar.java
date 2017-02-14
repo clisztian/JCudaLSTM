@@ -8,7 +8,6 @@ import java.util.Random;
 
 import ch.imetrica.recurrentnn.datasets.EmbeddedReberGrammar;
 import ch.imetrica.recurrentnn.datastructs.DataSet;
-import ch.imetrica.recurrentnn.model.Model;
 import ch.imetrica.recurrentnn.model.NeuralNetwork;
 import ch.imetrica.recurrentnn.trainer.Trainer;
 import ch.imetrica.recurrentnn.util.NeuralNetworkConstructor;

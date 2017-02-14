@@ -1,11 +1,16 @@
 package ch.imetrica.recurrentnn.model;
 
 
+import static jcuda.driver.JCudaDriver.cuCtxCreate;
 import static jcuda.driver.JCudaDriver.cuCtxSynchronize;
+import static jcuda.driver.JCudaDriver.cuDeviceGet;
+import static jcuda.driver.JCudaDriver.cuInit;
 import static jcuda.driver.JCudaDriver.cuLaunchKernel;
 import static jcuda.driver.JCudaDriver.cuModuleGetFunction;
 import static jcuda.driver.JCudaDriver.cuModuleLoadData;
+import static jcuda.jcurand.JCurand.curandCreateGenerator;
 import static jcuda.jcurand.JCurand.curandSetPseudoRandomGeneratorSeed;
+import static jcuda.jcurand.curandRngType.CURAND_RNG_PSEUDO_DEFAULT;
 import static jcuda.nvrtc.JNvrtc.nvrtcCompileProgram;
 import static jcuda.nvrtc.JNvrtc.nvrtcCreateProgram;
 import static jcuda.nvrtc.JNvrtc.nvrtcDestroyProgram;
@@ -24,10 +29,15 @@ import ch.imetrica.recurrentnn.datastructs.DataStep;
 import ch.imetrica.recurrentnn.loss.Loss;
 import ch.imetrica.recurrentnn.loss.LossSumOfSquares;
 import ch.imetrica.recurrentnn.matrix.Matrix;
+import ch.imetrica.recurrentnn.util.NeuralNetworkConstructor;
 import jcuda.Pointer;
+import jcuda.driver.CUcontext;
+import jcuda.driver.CUdevice;
 import jcuda.driver.CUfunction;
 import jcuda.driver.CUmodule;
+import jcuda.driver.JCudaDriver;
 import jcuda.jcurand.curandGenerator;
+import jcuda.nvrtc.JNvrtc;
 import jcuda.nvrtc.nvrtcProgram;
 
 
@@ -135,6 +145,10 @@ public class LstmLayer implements Model {
 		setupOutMatrices();
 	}
 
+	public LstmLayer() {
+		// TODO Auto-generated constructor stub
+	}
+
 	@Override
 	public Matrix forward(Matrix input, Graph g) throws Exception {
 		
@@ -210,17 +224,14 @@ public class LstmLayer implements Model {
 		g.elmul(outputGate, outnonlin, output);
 		
 		hiddenContext.copy(output);
-		cellContext.copy(cellAct);		
+		cellContext.copy(cellAct);	
+		
+		//hiddenContext.printMatrix();
 	}
 		
 	@Override
     public void forward_ff(Matrix input, Graph g) throws Exception {
 		
-//    	nn.layers.get(0).static_forward(input, g);
-//    	
-//		for (int i = 1; i < nn.layers.size(); i++) {
-//			nn.layers.get(i).static_forward(nn.layers.get(i-1).getOutput(), g);
-//		}
 	}
 
 
@@ -324,7 +335,7 @@ public class LstmLayer implements Model {
 	}
 	
 	
-	public static void resetState(List<LstmLayer> layers)
+	public static void resetState(List<Model> layers)
 	{
 		for (Model layer : layers) {
 			layer.resetState();
@@ -350,7 +361,7 @@ public class LstmLayer implements Model {
 		return result;
 	}
 	
-	
+	@Override
 	public void deleteParameters()
 	{
 		Wix.destroyMatrix();
@@ -396,6 +407,8 @@ public class LstmLayer implements Model {
 		retainCell.destroyMatrix();
 		writeCell.destroyMatrix();
 		cellAct.destroyMatrix();
+		outnonlin.destroyMatrix();
+		output.destroyMatrix();
 				
 		
 	}
@@ -419,8 +432,19 @@ public class LstmLayer implements Model {
 	
 	
 	
-	public void testLSTM(List<DataSequence> traindata, List<DataSequence> testdata, int number_epochs, curandGenerator rng) throws Exception
+	public void testLSTM(int number_epochs, curandGenerator rng) throws Exception
 	{
+		
+		JCudaDriver.setExceptionsEnabled(true);
+        JNvrtc.setExceptionsEnabled(true);
+
+        // Initialize the driver and create a context for the first device.
+        cuInit(0);
+        CUdevice device = new CUdevice();
+        cuDeviceGet(device, 0);
+        CUcontext context = new CUcontext();
+        cuCtxCreate(context, 0, device);
+		
 		
 		double numerLoss = 0;
 		double denomLoss = 0;
@@ -433,8 +457,17 @@ public class LstmLayer implements Model {
 		double intStdDev = 0.08;
 		
 		
-        Random r = new Random(32);		        
+        Random r = new Random();		        
 		DataSet data = new EmbeddedReberGrammar(r);
+		
+		int count = 0;
+        for (DataSequence seq : data.training) {
+			
+			System.out.println("Sequence... " + count); 
+			System.out.println(seq.toString());
+			count++;
+        }
+		
 		
 		
 		int inputDimension = data.inputDimension;
@@ -450,7 +483,7 @@ public class LstmLayer implements Model {
         // Print the compilation log (for the case there are any warnings)
         String[] programLog = new String[1];
         nvrtcGetProgramLog(program, programLog);
-        System.out.println("Nonlinear Backprob Program compilation log:\n" + programLog[0]); 
+        //System.out.println("Nonlinear Backprob Program compilation log:\n" + programLog[0]); 
     	    	
         // Obtain the PTX ("CUDA Assembler") code of the compiled program
         String[] ptx = new String[1];
@@ -464,101 +497,169 @@ public class LstmLayer implements Model {
         // Obtain the function pointer to the "add" function from the module
         function = new CUfunction();				
 		
-		
-		Graph g = new Graph();
-		Nonlinearity hiddenUnit = new SigmoidUnit();
-        Nonlinearity fInputGate = new TanhUnit();
-
-		Loss lossReporting = new LossSumOfSquares();
-		Loss lossTraining = new LossSumOfSquares();
-		
-		List<Model> LSTMNet = makeLstm(inputDimension, hiddenDimension, 1, hiddenLayers, outputDimension,
-				 fInputGate, intStdDev, rng);
-				
-		
-		for(int i = 0; i < number_epochs; i++)
-		{
-		 
-		  numerLoss = 0;
-		  denomLoss = 0;		
-			
-		  for (DataSequence seq : traindata) {
-			
-			resetState(LSTMNet);
-			g.emptyBackpropQueue();
-			
-			for (DataStep step : seq.steps) {
-				
-				forward_ff(feedForwardNet, step.input, g);
-				
-				if (step.targetOutput != null) {
-					
-					double loss = lossReporting.measure(getOutput(feedForwardNet), step.targetOutput);					
-					if (Double.isNaN(loss) || Double.isInfinite(loss)) {
-						
-						throw new RuntimeException("Could not converge");
-						
-					}
-					
-					numerLoss += loss;
-					denomLoss++;			
-					if (applyTraining) {
-						lossTraining.backward(getOutput(feedForwardNet), step.targetOutput);
-					}
-				}
-			}
-
-			if (applyTraining) {
-				
-				g.backward(); 
-				updateModelParams(module, function, feedForwardNet, stepSize, decayRate, regularization, smoothEpsilon, gradientClipValue);
-			}	
-		  }
-		  if(i%10 == 0) {
-			  System.out.println("Epoch " + i + " average loss = " + numerLoss/denomLoss);
-		  }
-		}
-		
-		
-		
-		for (DataSequence seq : testdata) {
-				
-			resetState(feedForwardNet);
-			g.emptyBackpropQueue();
-			
-			for (DataStep step : seq.steps) {
-				
-				forward_ff(feedForwardNet, step.input, g);
-				
-				if (step.targetOutput != null) {
-					
-					double loss = lossReporting.measure(getOutput(feedForwardNet), step.targetOutput);					
-					if (Double.isNaN(loss) || Double.isInfinite(loss)) {
-						
-						throw new RuntimeException("Could not converge");
-						
-					}
-					
-					numerLoss += loss;
-					denomLoss++;			
-				}
-			}	
-		  }
-		  System.out.println("Test set average loss = " + numerLoss/denomLoss);
-		
-		
-	
-		
-		deleteNetwork(feedForwardNet);
+//		
+//		Graph g = new Graph();
+//		Loss lossReporting = new LossSumOfSquares();
+//		Loss lossTraining = new LossSumOfSquares();
+//		
+//		NeuralNetwork LSTMNet = NeuralNetworkConstructor.makeLstm(inputDimension, hiddenDimension, 1, hiddenLayers, outputDimension,
+//				data.getModelOutputUnitToUse(), intStdDev, rng);
+//				
+//		
+//		for(int i = 0; i < number_epochs; i++)
+//		{
+//		 
+//		  numerLoss = 0;
+//		  denomLoss = 0;		
+//			
+//		  for (DataSequence seq : data.training) {
+//			
+//			System.out.println("Sequence..."); 
+//			
+//			System.out.println(seq.toString());
+//			LSTMNet.resetState();
+//			g.emptyBackpropQueue();
+//			
+//			for (DataStep step : seq.steps) {
+//				
+//				LSTMNet.forward_ff(step.input, g);
+//				
+//				if (step.targetOutput != null) {
+//					
+//					double loss = lossReporting.measure(LSTMNet.getOutput(), step.targetOutput);					
+//					if (Double.isNaN(loss) || Double.isInfinite(loss)) {
+//						
+//						throw new RuntimeException("Could not converge");
+//						
+//					}
+//					
+//					numerLoss += loss;
+//					denomLoss++;			
+//					if (applyTraining) {
+//						lossTraining.backward(LSTMNet.getOutput(), step.targetOutput);
+//					}
+//				}
+//			}
+//
+//			if (applyTraining) {
+//				
+//				g.backward(); 
+//				updateModelParams(module, function, LSTMNet, stepSize, decayRate, regularization, smoothEpsilon, gradientClipValue);
+//			}	
+//		  }
+//		  if(i%10 == 0) {
+//			  System.out.println("Epoch " + i + " average loss = " + numerLoss/denomLoss);
+//		  }
+//		}
+//		
+//		
+//		
+//		for (DataSequence seq : data.testing) {
+//				
+//			LSTMNet.resetState();
+//			g.emptyBackpropQueue();
+//			
+//			for (DataStep step : seq.steps) {
+//				
+//				LSTMNet.forward_ff(step.input, g);
+//				
+//				if (step.targetOutput != null) {
+//					
+//					double loss = lossReporting.measure(LSTMNet.getOutput(), step.targetOutput);					
+//					if (Double.isNaN(loss) || Double.isInfinite(loss)) {
+//						
+//						throw new RuntimeException("Could not converge");
+//						
+//					}
+//					
+//					numerLoss += loss;
+//					denomLoss++;			
+//				}
+//			}	
+//		  }
+//		  System.out.println("Test set average loss = " + numerLoss/denomLoss);
+//		
+//		
+//	
+//		  for(int i = 0; i < data.training.size(); i++)    data.training.get(i).destroyDataSequence();		
+//		  for(int i = 0; i < data.validation.size(); i++)  data.validation.get(i).destroyDataSequence();
+//		  for(int i = 0; i < data.testing.size(); i++)     data.testing.get(i).destroyDataSequence();
+//		  
+//		  LSTMNet.deleteParameters();
 		
 		
 	}
 	
 	
+	private void updateModelParams(CUmodule module, CUfunction function, int n, double stepSize, double decayRate, double regularization, 
+			 double smoothEpsilon, double gradientClipValue, Pointer w, Pointer dw, Pointer cached)
+	{
+
+		
+		    cuModuleGetFunction(function, module, "updateParameters");
+	        Pointer kernelParameters = Pointer.to(
+	            Pointer.to(new int[]{n}),
+	            Pointer.to(new double[]{stepSize}),
+	            Pointer.to(new double[]{decayRate}),
+	            Pointer.to(new double[]{regularization}),
+	            Pointer.to(new double[]{smoothEpsilon}),
+	            Pointer.to(new double[]{gradientClipValue}),
+	            Pointer.to(w),
+	            Pointer.to(dw),
+	            Pointer.to(cached)
+	        );
+	                
+	        int blockSizeX = 256;
+           int gridSizeX = (n + blockSizeX - 1) / blockSizeX;
+	        cuLaunchKernel(function,
+	          gridSizeX,  1, 1,      // Grid dimension
+            blockSizeX, 1, 1,      // Block dimension
+            0, null,               // Shared memory size and stream
+            kernelParameters, null // Kernel-
+	        );
+	        
+          cuCtxSynchronize();
+	 }	
+	
+	
+	public void updateModelParams(CUmodule module, CUfunction function, NeuralNetwork nn, double stepSize, double decayRate, double regularization, 
+			 double smoothEpsilon, double gradientClipValue) throws Exception {
+		
+		for (Model layer : nn.layers) {			
+			for (Matrix m : layer.getParameters()) {
+								
+				updateModelParams(module, function, m.size, stepSize, decayRate, regularization, smoothEpsilon, 
+						gradientClipValue, m.w, m.dw, m.stepCache);		
+				
+			}
+		}
+	}
 	
 	
 	
-	
+	public static void main(String[] args)
+    {
+		curandGenerator rng = new curandGenerator();
+        curandCreateGenerator(rng, CURAND_RNG_PSEUDO_DEFAULT);
+        curandSetPseudoRandomGeneratorSeed(rng, 1234);
+		
+        
+        LstmLayer lstm = new LstmLayer();
+        
+        try {
+        	
+		    lstm.testLSTM(10, rng);
+			   
+		}
+		catch (Exception e) {
+				e.printStackTrace();
+		}   
+        
+		
+		
+	}
+
+
 	
 	
 }

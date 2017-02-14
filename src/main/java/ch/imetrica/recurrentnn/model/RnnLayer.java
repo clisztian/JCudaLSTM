@@ -75,4 +75,11 @@ public class RnnLayer implements Model {
 		return result;
 	}
 
+	@Override
+	public void deleteParameters() {
+		W.destroyMatrix();
+		b.destroyMatrix();
+		context.destroyMatrix();
+	}
+
 }

@@ -40,12 +40,12 @@ public class DataStep implements Serializable {
 		double[] targetOutputHost = null;
 		double[] inputHost = new double[input.size];
 		cudaMemcpy(Pointer.to(inputHost), input.w, 
-		        Sizeof.DOUBLE, cudaMemcpyDeviceToHost);
+				input.size*Sizeof.DOUBLE, cudaMemcpyDeviceToHost);
 		
 		if (targetOutput != null) {
 			targetOutputHost = new double[targetOutput.size];
 			cudaMemcpy(Pointer.to(targetOutputHost), targetOutput.w, 
-			        Sizeof.DOUBLE, cudaMemcpyDeviceToHost);
+					targetOutput.size*Sizeof.DOUBLE, cudaMemcpyDeviceToHost);
 		}
 		
 		

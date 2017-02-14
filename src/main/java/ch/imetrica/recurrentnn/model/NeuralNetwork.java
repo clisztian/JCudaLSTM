@@ -33,15 +33,6 @@ public class NeuralNetwork implements Model {
 	}
 	
 	
-//	public void static_forward(Matrix input, Graph g, Matrix out) throws Exception {
-//		Matrix prev = input;
-//		for (Model layer : layers) {
-//			prev = layer.forward(prev, g);
-//		}
-//		return prev;
-//	}
-	
-	
 	@Override
 	public void resetState() {
 		for (Model layer : layers) {
@@ -66,10 +57,18 @@ public class NeuralNetwork implements Model {
 	@Override
 	public void forward_ff(Matrix input, Graph g) throws Exception {
 		
-        layers.get(0).static_forward(input, g);
-    	
+        layers.get(0).static_forward(input, g);  	
 		for (int i = 1; i < layers.size(); i++) {
 			layers.get(i).static_forward(layers.get(i-1).getOutput(), g);
+		}
+		
+	}
+
+	@Override
+	public void deleteParameters() {
+		
+		for (Model layer : layers) {
+			layer.deleteParameters();
 		}
 		
 	}

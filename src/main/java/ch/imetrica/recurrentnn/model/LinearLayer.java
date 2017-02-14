@@ -55,4 +55,9 @@ public class LinearLayer implements Model {
 		result.add(W);
 		return result;
 	}
+
+	@Override
+	public void deleteParameters() {
+		W.destroyMatrix();
+	}
 }

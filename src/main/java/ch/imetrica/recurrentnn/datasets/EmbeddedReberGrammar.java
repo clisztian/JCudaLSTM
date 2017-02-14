@@ -10,7 +10,6 @@ import ch.imetrica.recurrentnn.loss.LossSumOfSquares;
 import ch.imetrica.recurrentnn.model.Model;
 import ch.imetrica.recurrentnn.model.Nonlinearity;
 import ch.imetrica.recurrentnn.model.SigmoidUnit;
-import jcuda.jcurand.curandGenerator;
 
 
 
@@ -82,7 +81,7 @@ public class EmbeddedReberGrammar extends DataSet {
 		states[18] = new State(new Transition[] {new Transition(14,P), new Transition(15,V)});
 		
 		for (int sequence = 0; sequence < sequences; sequence++) {
-			List<DataStep> steps = new ArrayList<>();;		
+			List<DataStep> steps = new ArrayList<>();		
 			int state_id = 0;
 			while (true) {
 				int transition = -1;
@@ -97,6 +96,8 @@ public class EmbeddedReberGrammar extends DataSet {
 				observation = new double[7];
 				observation[states[state_id].transitions[transition].token] = 1.0;
 				
+				
+				
 				state_id = states[state_id].transitions[transition].next_state_id;
 				if (state_id == 0) { //exit at end of sequence
 					break;
@@ -105,9 +106,20 @@ public class EmbeddedReberGrammar extends DataSet {
 				for (int i = 0; i < states[state_id].transitions.length; i++) {
 					target_output[states[state_id].transitions[i].token] = 1.0;
 				}
+				
+//				for(int i = 0; i < 7; i++) {System.out.print(observation[i] + ", ");}
+//				System.out.print(" --> ");
+//				for(int i = 0; i < 7; i++) {System.out.print(target_output[i] + ", ");}
+//				System.out.println();
+				
+//				for(int i = 0; i < 7; i++)
+//				{System.out.println(observation[i]  + " " +  target_output[i]); }
+				
+			    //System.out.println(temp.toString());
 				steps.add(new DataStep(observation, target_output));
 			}
 			result.add(new DataSequence(steps));
+			//System.out.println(result.get(result.size() - 1).toString());
 		}
 		return result;
 	}

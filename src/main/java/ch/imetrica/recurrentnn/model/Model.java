@@ -16,5 +16,6 @@ public interface Model extends Serializable {
 	void resetState();
 	List<Matrix> getParameters();
 	Matrix getOutput();
+	void deleteParameters();
 }
 
