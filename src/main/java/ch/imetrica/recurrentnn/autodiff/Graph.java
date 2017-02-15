@@ -655,8 +655,9 @@ public class Graph {
 	{
 		double hostOutputW[] = new double[size];        
         cudaMemcpy(Pointer.to(hostOutputW), v,  size * Sizeof.DOUBLE, cudaMemcpyDeviceToHost);
-        System.out.println("Printing out pointer...");
-        for(int i = 0; i < size; i++) {System.out.println(hostOutputW[i]);}
+        //System.out.println("Printing out pointer...");
+        for(int i = 0; i < size; i++) {System.out.print(hostOutputW[i] + ", ");}
+        System.out.println();
 	}
 	
 	

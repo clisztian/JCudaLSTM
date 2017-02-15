@@ -461,7 +461,7 @@ public class LstmLayer implements Model {
 		DataSet data = new EmbeddedReberGrammar(r);
 		
 		int count = 0;
-        for (DataSequence seq : data.training) {
+        for (DataSequence seq : data.testing) {
 			
 			System.out.println("Sequence... " + count); 
 			System.out.println(seq.toString());
@@ -497,95 +497,92 @@ public class LstmLayer implements Model {
         // Obtain the function pointer to the "add" function from the module
         function = new CUfunction();				
 		
-//		
-//		Graph g = new Graph();
-//		Loss lossReporting = new LossSumOfSquares();
-//		Loss lossTraining = new LossSumOfSquares();
-//		
-//		NeuralNetwork LSTMNet = NeuralNetworkConstructor.makeLstm(inputDimension, hiddenDimension, 1, hiddenLayers, outputDimension,
-//				data.getModelOutputUnitToUse(), intStdDev, rng);
-//				
-//		
-//		for(int i = 0; i < number_epochs; i++)
-//		{
-//		 
-//		  numerLoss = 0;
-//		  denomLoss = 0;		
-//			
-//		  for (DataSequence seq : data.training) {
-//			
-//			System.out.println("Sequence..."); 
-//			
-//			System.out.println(seq.toString());
-//			LSTMNet.resetState();
-//			g.emptyBackpropQueue();
-//			
-//			for (DataStep step : seq.steps) {
-//				
-//				LSTMNet.forward_ff(step.input, g);
-//				
-//				if (step.targetOutput != null) {
-//					
-//					double loss = lossReporting.measure(LSTMNet.getOutput(), step.targetOutput);					
-//					if (Double.isNaN(loss) || Double.isInfinite(loss)) {
-//						
-//						throw new RuntimeException("Could not converge");
-//						
-//					}
-//					
-//					numerLoss += loss;
-//					denomLoss++;			
-//					if (applyTraining) {
-//						lossTraining.backward(LSTMNet.getOutput(), step.targetOutput);
-//					}
-//				}
-//			}
-//
-//			if (applyTraining) {
-//				
-//				g.backward(); 
-//				updateModelParams(module, function, LSTMNet, stepSize, decayRate, regularization, smoothEpsilon, gradientClipValue);
-//			}	
-//		  }
-//		  if(i%10 == 0) {
-//			  System.out.println("Epoch " + i + " average loss = " + numerLoss/denomLoss);
-//		  }
-//		}
-//		
-//		
-//		
-//		for (DataSequence seq : data.testing) {
-//				
-//			LSTMNet.resetState();
-//			g.emptyBackpropQueue();
-//			
-//			for (DataStep step : seq.steps) {
-//				
-//				LSTMNet.forward_ff(step.input, g);
-//				
-//				if (step.targetOutput != null) {
-//					
-//					double loss = lossReporting.measure(LSTMNet.getOutput(), step.targetOutput);					
-//					if (Double.isNaN(loss) || Double.isInfinite(loss)) {
-//						
-//						throw new RuntimeException("Could not converge");
-//						
-//					}
-//					
-//					numerLoss += loss;
-//					denomLoss++;			
-//				}
-//			}	
-//		  }
-//		  System.out.println("Test set average loss = " + numerLoss/denomLoss);
-//		
-//		
-//	
-//		  for(int i = 0; i < data.training.size(); i++)    data.training.get(i).destroyDataSequence();		
-//		  for(int i = 0; i < data.validation.size(); i++)  data.validation.get(i).destroyDataSequence();
-//		  for(int i = 0; i < data.testing.size(); i++)     data.testing.get(i).destroyDataSequence();
-//		  
-//		  LSTMNet.deleteParameters();
+		
+		Graph g = new Graph();
+		Loss lossReporting = data.lossReporting;
+		Loss lossTraining = data.lossTraining;
+		
+		NeuralNetwork LSTMNet = NeuralNetworkConstructor.makeLstm(inputDimension, hiddenDimension, 1, hiddenLayers, outputDimension,
+				data.getModelOutputUnitToUse(), intStdDev, rng);
+				
+		
+		for(int i = 0; i < number_epochs; i++)
+		{
+		 
+		  numerLoss = 0;
+		  denomLoss = 0;		
+			
+		  for (DataSequence seq : data.training) {
+			
+			LSTMNet.resetState();
+			g.emptyBackpropQueue();
+			
+			for (DataStep step : seq.steps) {
+				
+				LSTMNet.forward_ff(step.input, g);
+				
+				if (step.targetOutput != null) {
+					
+					double loss = lossReporting.measure(LSTMNet.getOutput(), step.targetOutput);					
+					if (Double.isNaN(loss) || Double.isInfinite(loss)) {
+						
+						throw new RuntimeException("Could not converge");
+						
+					}
+					
+					numerLoss += loss;
+					denomLoss++;			
+					if (applyTraining) {
+						lossTraining.backward(LSTMNet.getOutput(), step.targetOutput);
+					}
+				}
+			}
+
+			if (applyTraining) {
+				
+				g.backward(); 
+				updateModelParams(module, function, LSTMNet, stepSize, decayRate, regularization, smoothEpsilon, gradientClipValue);
+			}	
+		  }
+		  if(i%10 == 0) {
+			  System.out.println("Epoch " + i + " average loss = " + numerLoss/denomLoss);
+		  }
+		}
+		
+		
+		
+		for (DataSequence seq : data.testing) {
+				
+			LSTMNet.resetState();
+			g.emptyBackpropQueue();
+			
+			for (DataStep step : seq.steps) {
+				
+				LSTMNet.forward_ff(step.input, g);
+				
+				if (step.targetOutput != null) {
+					
+					double loss = lossReporting.measure(LSTMNet.getOutput(), step.targetOutput);					
+					if (Double.isNaN(loss) || Double.isInfinite(loss)) {
+						
+						throw new RuntimeException("Could not converge");
+						
+					}
+					
+					numerLoss += loss;
+					denomLoss++;			
+				}
+			}	
+		  }
+		  System.out.println("Test set average loss = " + numerLoss/denomLoss);
+		
+		
+	
+		  for(int i = 0; i < data.training.size(); i++)    data.training.get(i).destroyDataSequence();		
+		  for(int i = 0; i < data.validation.size(); i++)  data.validation.get(i).destroyDataSequence();
+		  for(int i = 0; i < data.testing.size(); i++)     data.testing.get(i).destroyDataSequence();
+		  
+		  LSTMNet.deleteParameters();
 		
 		
 	}
@@ -631,6 +628,7 @@ public class LstmLayer implements Model {
 				updateModelParams(module, function, m.size, stepSize, decayRate, regularization, smoothEpsilon, 
 						gradientClipValue, m.w, m.dw, m.stepCache);		
 				
+			    Graph.printPointer(m.size, m.w);
 			}
 		}
 	}
