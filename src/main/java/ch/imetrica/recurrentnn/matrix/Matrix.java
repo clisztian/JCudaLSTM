@@ -257,14 +257,21 @@ public class Matrix implements Serializable {
     	
     	double mean = 0.0; 
     
-        // Create pseudo-random number generator 
-        curandCreateGenerator(generator, CURAND_RNG_PSEUDO_DEFAULT);
-
-        // Set seed 
-        curandSetPseudoRandomGeneratorSeed(generator, 1);
-
-        // Generate n floats on device 
-    	curandGenerateNormalDouble(generator, w, this.size, mean, initParamsStdDev);
+    	double hostData[] = new double[this.size];
+	    Arrays.fill(hostData,  .2*initParamsStdDev);
+	    
+	    cudaMemcpy(w, Pointer.to(hostData), size * Sizeof.DOUBLE,
+	        cudaMemcpyHostToDevice);
+    	
+    	
+//        // Create pseudo-random number generator 
+//        curandCreateGenerator(generator, CURAND_RNG_PSEUDO_DEFAULT);
+//
+//        // Set seed 
+//        curandSetPseudoRandomGeneratorSeed(generator, 1);
+//
+//        // Generate n floats on device 
+//    	curandGenerateNormalDouble(generator, w, this.size, mean, initParamsStdDev);
 		
 	}
     
@@ -1197,10 +1204,30 @@ public class Matrix implements Serializable {
 //        double hostCached[] = new double[this.size];        
 //        cudaMemcpy(Pointer.to(hostCached), this.stepCache,  this.size * Sizeof.DOUBLE, cudaMemcpyDeviceToHost);
         
-        for(int i = 0; i < this.size; i++)
+        for(int i = 0; i < this.rows; i++)
         {
+        	for(int j = 0; j < this.cols; j++)
+            {	
         	//System.out.println(i + " " + hostOutputW[i] + " " + hostInput[i] + " " + hostCached[i]);
-        	System.out.print(hostOutputW[i] + " ");
+        	  System.out.print(hostOutputW[j*this.rows + i] + ", ");
+            }
+        }
+        System.out.println("");
+    }
+    
+    public void printMatrixDW() {
+    	
+    	//-- Copy matrix to host
+        double hostOutputW[] = new double[this.size];        
+        cudaMemcpy(Pointer.to(hostOutputW), this.dw,  this.size * Sizeof.DOUBLE, cudaMemcpyDeviceToHost);
+        
+        for(int i = 0; i < this.rows; i++)
+        {
+        	for(int j = 0; j < this.cols; j++)
+            {	
+        	//System.out.println(i + " " + hostOutputW[i] + " " + hostInput[i] + " " + hostCached[i]);
+        	  System.out.print(hostOutputW[j*this.rows + i] + ", ");
+            }
         }
         System.out.println("");
     }

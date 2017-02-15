@@ -439,6 +439,13 @@ public class Graph {
 					matrixmultdw2(m2.rows, m2.cols, out.rows, m2.w, out.dw, m1.dw);
 					matrixmultdw1(m1.cols, m1.rows, out.cols, m1.w, out.dw, m2.dw);	
 					
+					Graph.printPointer(m1.size, m1.w);
+					Graph.printPointer(m2.size, m2.w);
+					Graph.printPointer(out.size, out.dw);
+					Graph.printPointer(m1.size, m1.dw);
+					Graph.printPointer(m2.size, m2.dw);
+					
+					System.out.println("");
 //					System.out.println("\n\nPrint M1 matrix after mul backprop..");
 //					m1.printMatrix();
 					

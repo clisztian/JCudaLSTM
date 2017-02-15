@@ -68,12 +68,11 @@ public class LstmLayer implements Model {
 	Matrix retainCell, writeCell, cellAct;
 	Matrix outnonlin, output; 
 		
-	
-	Nonlinearity fInputGate = new SigmoidUnit();
-	Nonlinearity fForgetGate = new SigmoidUnit();
-	Nonlinearity fOutputGate = new SigmoidUnit();
-	Nonlinearity fCellInput = new TanhUnit();
-	Nonlinearity fCellOutput = new TanhUnit();
+	Nonlinearity fInputGate;
+	Nonlinearity fForgetGate;
+	Nonlinearity fOutputGate;
+	Nonlinearity fCellInput;
+	Nonlinearity fCellOutput;	
 	
 	
 	private static String updateSourceCode = 
@@ -119,25 +118,32 @@ public class LstmLayer implements Model {
 		curandSetPseudoRandomGeneratorSeed(rng, seed);
 		prepareCuda();
 		
+		fInputGate = new SigmoidUnit();
+		fForgetGate = new SigmoidUnit();
+		fOutputGate = new SigmoidUnit();
+		fCellInput = new TanhUnit();
+		fCellOutput = new TanhUnit();
+		
+		
 		this.inputDimension = inputDimension;
 		this.outputDimension = outputDimension;
 		this.inputCols = inputCols;
 		
 		Wix = Matrix.rand(outputDimension, inputDimension, initParamsStdDev, rng);
 		Wih = Matrix.rand(outputDimension, outputDimension, initParamsStdDev, rng);
-		bi = new Matrix(outputDimension);
+		bi = Matrix.zeros(outputDimension);
+		
 		Wfx = Matrix.rand(outputDimension, inputDimension, initParamsStdDev, rng);
 		Wfh = Matrix.rand(outputDimension, outputDimension, initParamsStdDev, rng);
-		
-		//set forget bias to 1.0, as described here: http://jmlr.org/proceedings/papers/v37/jozefowicz15.pdf
 		bf = Matrix.ones(outputDimension, 1);
 		
 		Wox = Matrix.rand(outputDimension, inputDimension, initParamsStdDev, rng);
 		Woh = Matrix.rand(outputDimension, outputDimension, initParamsStdDev, rng);
-		bo = new Matrix(outputDimension);
+		bo = Matrix.zeros(outputDimension);
+		
 		Wcx = Matrix.rand(outputDimension, inputDimension, initParamsStdDev, rng);
 		Wch = Matrix.rand(outputDimension, outputDimension, initParamsStdDev, rng);
-		bc = new Matrix(outputDimension);
+		bc = Matrix.zeros(outputDimension);
 		
 		hiddenContext = Matrix.zeros(outputDimension, inputCols);
 		cellContext = Matrix.zeros(outputDimension, inputCols);
@@ -223,18 +229,26 @@ public class LstmLayer implements Model {
 		g.nonlin(fCellOutput, cellAct, outnonlin);				
 		g.elmul(outputGate, outnonlin, output);
 		
-		hiddenContext.copy(output);
-		cellContext.copy(cellAct);	
+		hiddenContext = output;
+		cellContext = cellAct;
 		
-		//hiddenContext.printMatrix();
 	}
 		
+
+	
 	@Override
     public void forward_ff(Matrix input, Graph g) throws Exception {
 		
 	}
 
 
+	public void printOutputWih()
+	{
+		outmul1.printMatrix();
+		outmul1.printMatrixDW();
+	}
+	
+	
     @Override
     public Matrix getOutput()
     {
@@ -242,7 +256,6 @@ public class LstmLayer implements Model {
     }
     
 	public void setupOutMatrices() {
-		
 		
 		outmul0 = Matrix.zeros(Wix.rows, inputCols);
 		outmul1 = Matrix.zeros(Wih.rows, hiddenContext.cols);
@@ -346,18 +359,18 @@ public class LstmLayer implements Model {
 	@Override
 	public List<Matrix> getParameters() {
 		List<Matrix> result = new ArrayList<>();
-		result.add(Wix);
-		result.add(Wih);
-		result.add(bi);
-		result.add(Wfx);
-		result.add(Wfh);
-		result.add(bf);
-		result.add(Wox);
-		result.add(Woh);
-		result.add(bo);
-		result.add(Wcx);
-		result.add(Wch);
-		result.add(bc);
+		result.add(Wix); //0
+		result.add(Wih); //1  !!
+		result.add(bi);  //2
+		result.add(Wfx); //3
+		result.add(Wfh); //4  !!
+		result.add(bf);  //5  !!
+		result.add(Wox); //6
+		result.add(Woh); //7  !!
+		result.add(bo);  //8
+		result.add(Wcx); //9
+		result.add(Wch); //10 !!
+		result.add(bc);  //11
 		return result;
 	}
 	
@@ -449,7 +462,7 @@ public class LstmLayer implements Model {
 		double numerLoss = 0;
 		double denomLoss = 0;
 		
-		double stepSize = .005; 
+		double stepSize = .001; 
 		double decayRate = 0.999;
 		double smoothEpsilon = 1e-8;
 		double gradientClipValue = 5;
@@ -460,13 +473,13 @@ public class LstmLayer implements Model {
         Random r = new Random();		        
 		DataSet data = new EmbeddedReberGrammar(r);
 		
-		int count = 0;
-        for (DataSequence seq : data.testing) {
-			
-			System.out.println("Sequence... " + count); 
-			System.out.println(seq.toString());
-			count++;
-        }
+//		int count = 0;
+//        for (DataSequence seq : data.testing) {
+//			
+//			System.out.println("Sequence... " + count); 
+//			System.out.println(seq.toString());
+//			count++;
+//        }
 		
 		
 		
@@ -497,7 +510,7 @@ public class LstmLayer implements Model {
         // Obtain the function pointer to the "add" function from the module
         function = new CUfunction();				
 		
-		
+		int count = 0;
 		Graph g = new Graph();
 		Loss lossReporting = data.lossReporting;
 		Loss lossTraining = data.lossTraining;
@@ -508,7 +521,8 @@ public class LstmLayer implements Model {
 		
 		for(int i = 0; i < number_epochs; i++)
 		{
-		 
+			
+		  count = 0;
 		  numerLoss = 0;
 		  denomLoss = 0;		
 			
@@ -517,7 +531,9 @@ public class LstmLayer implements Model {
 			LSTMNet.resetState();
 			g.emptyBackpropQueue();
 			
+			
 			for (DataStep step : seq.steps) {
+				
 				
 				LSTMNet.forward_ff(step.input, g);
 				
@@ -526,9 +542,9 @@ public class LstmLayer implements Model {
 					double loss = lossReporting.measure(LSTMNet.getOutput(), step.targetOutput);					
 					if (Double.isNaN(loss) || Double.isInfinite(loss)) {
 						
-						throw new RuntimeException("Could not converge");
-						
+						throw new RuntimeException("Could not converge");	
 					}
+			
 					
 					numerLoss += loss;
 					denomLoss++;			
@@ -536,13 +552,17 @@ public class LstmLayer implements Model {
 						lossTraining.backward(LSTMNet.getOutput(), step.targetOutput);
 					}
 				}
+				
 			}
+			System.out.println("Loss at " + count + " = " + numerLoss/denomLoss);
+			count++;
 
 			if (applyTraining) {
 				
 				g.backward(); 
 				updateModelParams(module, function, LSTMNet, stepSize, decayRate, regularization, smoothEpsilon, gradientClipValue);
-			}	
+			}
+			
 		  }
 		  if(i%10 == 0) {
 			  System.out.println("Epoch " + i + " average loss = " + numerLoss/denomLoss);
@@ -628,7 +648,6 @@ public class LstmLayer implements Model {
 				updateModelParams(module, function, m.size, stepSize, decayRate, regularization, smoothEpsilon, 
 						gradientClipValue, m.w, m.dw, m.stepCache);		
 				
-			    Graph.printPointer(m.size, m.w);
 			}
 		}
 	}
