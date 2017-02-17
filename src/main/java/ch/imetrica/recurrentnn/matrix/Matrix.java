@@ -251,6 +251,14 @@ public class Matrix implements Serializable {
 		JCublas.cublasDcopy(this.size, copyMe.w, 1, this.w, 1);		
 	}
 	
+	public static Matrix copyMatrix(final Matrix copyMe) throws Exception {
+		
+		Matrix result = new Matrix(copyMe.rows, copyMe.cols);		 
+		result.copy(copyMe);
+		
+		return result;
+	}
+	
 	
     public void rand(double initParamsStdDev, curandGenerator generator) 
     {

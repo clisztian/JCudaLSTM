@@ -405,7 +405,7 @@ public class Graph {
 	
 
 	/*
-	 * Out Matrix m1.rows, m2.cols
+	 * Out Matrix m1.rows, m2.colsW
 	 *   
 	 *   W, hiddenlayer, outmul
 	 */
@@ -420,21 +420,12 @@ public class Graph {
 		
 		matrixmultip(m1rows, m1cols, m2cols, m1.w, m2.w, out.w);		
 		
+		
 		if (this.applyBackprop) {
 			Runnable bp = new Runnable() {
 				public void run() {
 				
-//					System.out.println("\n\nPrint Out matrix from mul backprop..");
-//					out.printMatrix();
-//					
-//					System.out.println("\n\nPrint M1 matrix before mul backprop..");
-//					m1.printMatrix();
-//					
-//					System.out.println("\n\nPrint M2 matrix before mul backprop..");
-//					m2.printMatrix();
-					
-//					System.out.println("\n\nPrint dimensions.. " + m2.rows + " " + m2.cols + " " + out.cols );
-//					System.out.println("\n\nPrint dimensions.. " + m1.rows + " " + m1.cols + " " + out.cols );
+
 					
 					matrixmultdw2(m2.rows, m2.cols, out.rows, m2.w, out.dw, m1.dw);
 					matrixmultdw1(m1.cols, m1.rows, out.cols, m1.w, out.dw, m2.dw);	
@@ -446,11 +437,7 @@ public class Graph {
 					Graph.printPointer(m2.size, m2.dw);
 					
 					System.out.println("");
-//					System.out.println("\n\nPrint M1 matrix after mul backprop..");
-//					m1.printMatrix();
-					
-//					System.out.println("\n\nPrint M2 matrix after mul backprop..");
-//					m2.printMatrix();
+
 					
 				}
 			};
@@ -499,7 +486,7 @@ public class Graph {
 //        cublasDgemm(handle, CUBLAS_OP_N, CUBLAS_OP_T, hA, wB, wA, one, dA, hA, dB, wB, zero, temp, hA);
 //        cublasDgeam(handle, CUBLAS_OP_T, CUBLAS_OP_T, wB, hA, one, temp, hA, zero, temp, hA, out, wB);	
         
-        cublasDgemm(handle, CUBLAS_OP_N, CUBLAS_OP_T, hA, wB, wA, one, dA, hA, dB, wB, zero, out, hA);
+        cublasDgemm(handle, CUBLAS_OP_N, CUBLAS_OP_T, hA, wB, wA, one, dA, hA, dB, wB, one, out, hA);
         
         //cudaFree(temp);
 	}	

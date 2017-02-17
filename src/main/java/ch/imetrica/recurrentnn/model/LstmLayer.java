@@ -27,7 +27,6 @@ import ch.imetrica.recurrentnn.datastructs.DataSequence;
 import ch.imetrica.recurrentnn.datastructs.DataSet;
 import ch.imetrica.recurrentnn.datastructs.DataStep;
 import ch.imetrica.recurrentnn.loss.Loss;
-import ch.imetrica.recurrentnn.loss.LossSumOfSquares;
 import ch.imetrica.recurrentnn.matrix.Matrix;
 import ch.imetrica.recurrentnn.util.NeuralNetworkConstructor;
 import jcuda.Pointer;
@@ -48,6 +47,7 @@ public class LstmLayer implements Model {
 	int inputDimension;
 	int outputDimension;
 	int inputCols;
+	int nsteps; 
 	
 	public CUmodule module; 
 	public CUfunction function;
@@ -57,16 +57,11 @@ public class LstmLayer implements Model {
 	Matrix Wox, Woh, bo;
 	Matrix Wcx, Wch, bc;
 	
-	Matrix hiddenContext;
-	Matrix cellContext;
+	List<Matrix> hiddenContext;
+	List<Matrix> cellContext;
 
+	List<LstmCell> lstmCells;
 	
-	Matrix outmul0, outmul1, outadd0, outadd1, outinputGate;
-	Matrix outmul2, outmul3, outadd2, outadd3, outforgetGate;
-	Matrix outmul4, outmul5, outadd4, outadd5, outputGate;
-	Matrix outmul6, outmul7, outadd6, outadd7, cellInput;
-	Matrix retainCell, writeCell, cellAct;
-	Matrix outnonlin, output; 
 		
 	Nonlinearity fInputGate;
 	Nonlinearity fForgetGate;
@@ -124,7 +119,6 @@ public class LstmLayer implements Model {
 		fCellInput = new TanhUnit();
 		fCellOutput = new TanhUnit();
 		
-		
 		this.inputDimension = inputDimension;
 		this.outputDimension = outputDimension;
 		this.inputCols = inputCols;
@@ -145,12 +139,27 @@ public class LstmLayer implements Model {
 		Wch = Matrix.rand(outputDimension, outputDimension, initParamsStdDev, rng);
 		bc = Matrix.zeros(outputDimension);
 		
-		hiddenContext = Matrix.zeros(outputDimension, inputCols);
-		cellContext = Matrix.zeros(outputDimension, inputCols);
+		//List of hiddenContext for the recurrent component
+		hiddenContext = new ArrayList<Matrix>();
+		cellContext = new ArrayList<Matrix>();
 		
-		setupOutMatrices();
+		hiddenContext.add(Matrix.zeros(outputDimension, inputCols));
+		cellContext.add(Matrix.zeros(outputDimension, inputCols));
+		
+		lstmCells = new ArrayList<LstmCell>();
+		
+		//lstmCells.add(LstmCell.zeros(inputDimension, outputDimension, inputCols));
+		
+		nsteps = 0;
 	}
 
+	
+	public void initializeHiddenContext(int steps)
+	{
+		
+	}
+	
+	
 	public LstmLayer() {
 		// TODO Auto-generated constructor stub
 	}
@@ -158,80 +167,89 @@ public class LstmLayer implements Model {
 	@Override
 	public Matrix forward(Matrix input, Graph g) throws Exception {
 		
+		nsteps = hiddenContext.size() - 1;
+		
 		//input gate  
 		Matrix sum0 = g.mul(Wix, input);
-		Matrix sum1 = g.mul(Wih, hiddenContext);
+		Matrix sum1 = g.mul(Wih, hiddenContext.get(nsteps));
 		Matrix inputGate = g.nonlin(fInputGate, g.add(g.add(sum0, sum1), bi));
 		
 		//forget gate
 		Matrix sum2 = g.mul(Wfx, input);
-		Matrix sum3 = g.mul(Wfh, hiddenContext);
+		Matrix sum3 = g.mul(Wfh, hiddenContext.get(nsteps));
 		Matrix forgetGate = g.nonlin(fForgetGate, g.add(g.add(sum2, sum3), bf));
 		
 		//output gate
 		Matrix sum4 = g.mul(Wox, input);
-		Matrix sum5 = g.mul(Woh, hiddenContext);
+		Matrix sum5 = g.mul(Woh, hiddenContext.get(nsteps));
 		Matrix outputGate = g.nonlin(fOutputGate, g.add(g.add(sum4, sum5), bo));
 
 		//write operation on cells
 		Matrix sum6 = g.mul(Wcx, input);
-		Matrix sum7 = g.mul(Wch, hiddenContext);
+		Matrix sum7 = g.mul(Wch, hiddenContext.get(nsteps));
 		Matrix cellInput = g.nonlin(fCellInput, g.add(g.add(sum6, sum7), bc));
 		
 		//compute new cell activation
-		Matrix retainCell = g.elmul(forgetGate, cellContext);
+		Matrix retainCell = g.elmul(forgetGate, cellContext.get(nsteps));
 		Matrix writeCell = g.elmul(inputGate,  cellInput);
 		Matrix cellAct = g.add(retainCell,  writeCell);
 		
 		//compute hidden state as gated, saturated cell activations
 		Matrix output = g.elmul(outputGate, g.nonlin(fCellOutput, cellAct));
 	
-		hiddenContext = output;
-		cellContext = cellAct;
+		hiddenContext.add(output);
+		cellContext.add(cellAct);
 		
 		return output;
 	}
 	
 	
+
+	
 	@Override
 	public void static_forward(Matrix input, Graph g) throws Exception 
 	{
 		
+//		if(nsteps == lstmCells.size()) 
+//		{lstmCells.add(LstmCell.zeros(inputDimension, outputDimension, inputCols));}
 		
-		g.mul(Wix, input, outmul0);
-		g.mul(Wih, hiddenContext, outmul1);
-		g.add(outmul0, outmul1, outadd0);
-		g.add(outadd0, bi, outadd1);
-		g.nonlin(fInputGate, outadd1, outinputGate);
+		lstmCells.add(LstmCell.zeros(inputDimension, outputDimension, inputCols));
+			
+		g.mul(Wix, input, lstmCells.get(nsteps).outmul0);
+		g.mul(Wih, hiddenContext.get(nsteps), lstmCells.get(nsteps).outmul1);
+		g.add(lstmCells.get(nsteps).outmul0, lstmCells.get(nsteps).outmul1, lstmCells.get(nsteps).outadd0);
+		g.add(lstmCells.get(nsteps).outadd0, bi, lstmCells.get(nsteps).outadd1);
+		g.nonlin(fInputGate, lstmCells.get(nsteps).outadd1, lstmCells.get(nsteps).outinputGate);
 	
-		g.mul(Wfx, input, outmul2);
-		g.mul(Wfh, hiddenContext, outmul3);
-		g.add(outmul2, outmul3, outadd2);
-		g.add(outadd2, bf, outadd3);
-		g.nonlin(fForgetGate, outadd3, outforgetGate);	
+		g.mul(Wfx, input, lstmCells.get(nsteps).outmul2);
+		g.mul(Wfh, hiddenContext.get(nsteps), lstmCells.get(nsteps).outmul3);
+		g.add(lstmCells.get(nsteps).outmul2, lstmCells.get(nsteps).outmul3, lstmCells.get(nsteps).outadd2);
+		g.add(lstmCells.get(nsteps).outadd2, bf, lstmCells.get(nsteps).outadd3);
+		g.nonlin(fForgetGate, lstmCells.get(nsteps).outadd3, lstmCells.get(nsteps).outforgetGate);	
 	
-		g.mul(Wox, input, outmul4);
-		g.mul(Woh, hiddenContext, outmul5);
-		g.add(outmul4, outmul5, outadd4);
-		g.add(outadd4, bo, outadd5);
-		g.nonlin(fOutputGate, outadd5, outputGate);	
+		g.mul(Wox, input, lstmCells.get(nsteps).outmul4);
+		g.mul(Woh, hiddenContext.get(nsteps), lstmCells.get(nsteps).outmul5);
+		g.add(lstmCells.get(nsteps).outmul4, lstmCells.get(nsteps).outmul5, lstmCells.get(nsteps).outadd4);
+		g.add(lstmCells.get(nsteps).outadd4, bo, lstmCells.get(nsteps).outadd5);
+		g.nonlin(fOutputGate, lstmCells.get(nsteps).outadd5, lstmCells.get(nsteps).outputGate);	
 		
-		g.mul(Wcx, input, outmul6);
-		g.mul(Wch, hiddenContext, outmul7);
-		g.add(outmul6, outmul7, outadd6);
-		g.add(outadd6, bc, outadd7);
-		g.nonlin(fCellInput, outadd7, cellInput);	
+		g.mul(Wcx, input, lstmCells.get(nsteps).outmul6);
+		g.mul(Wch, hiddenContext.get(nsteps), lstmCells.get(nsteps).outmul7);
+		g.add(lstmCells.get(nsteps).outmul6, lstmCells.get(nsteps).outmul7, lstmCells.get(nsteps).outadd6);
+		g.add(lstmCells.get(nsteps).outadd6, bc, lstmCells.get(nsteps).outadd7);
+		g.nonlin(fCellInput, lstmCells.get(nsteps).outadd7, lstmCells.get(nsteps).cellInput);	
 		
-		g.elmul(outforgetGate, cellContext, retainCell);
-		g.elmul(outinputGate,  cellInput, writeCell);
-		g.add(retainCell,  writeCell, cellAct);
+		g.elmul(lstmCells.get(nsteps).outforgetGate, cellContext.get(nsteps), lstmCells.get(nsteps).retainCell);
+		g.elmul(lstmCells.get(nsteps).outinputGate,  lstmCells.get(nsteps).cellInput, lstmCells.get(nsteps).writeCell);
+		g.add(lstmCells.get(nsteps).retainCell,  lstmCells.get(nsteps).writeCell, lstmCells.get(nsteps).cellAct);
 		
-		g.nonlin(fCellOutput, cellAct, outnonlin);				
-		g.elmul(outputGate, outnonlin, output);
-		
-		hiddenContext = output;
-		cellContext = cellAct;
-		
+		g.nonlin(fCellOutput, lstmCells.get(nsteps).cellAct, lstmCells.get(nsteps).outnonlin);				
+		g.elmul(lstmCells.get(nsteps).outputGate, lstmCells.get(nsteps).outnonlin, lstmCells.get(nsteps).output);
+				
+		hiddenContext.add(Matrix.copyMatrix(lstmCells.get(nsteps).output));
+		cellContext.add(Matrix.copyMatrix(lstmCells.get(nsteps).cellAct));
+
+		nsteps++;
 	}
 		
 
@@ -241,55 +259,15 @@ public class LstmLayer implements Model {
 		
 	}
 
-
-	public void printOutputWih()
-	{
-		outmul1.printMatrix();
-		outmul1.printMatrixDW();
-	}
 	
 	
     @Override
     public Matrix getOutput()
     {
-    	return output;
+    	return lstmCells.get(lstmCells.size() - 1).output;
     }
     
-	public void setupOutMatrices() {
-		
-		outmul0 = Matrix.zeros(Wix.rows, inputCols);
-		outmul1 = Matrix.zeros(Wih.rows, hiddenContext.cols);
-		outadd0 = Matrix.zeros(outmul0.rows, outmul1.cols);
-		outadd1 = Matrix.zeros(outadd0.rows, bi.cols);
-		outinputGate = Matrix.zeros(outadd1.rows, outadd1.cols);
 
-		outmul2 = Matrix.zeros(Wfx.rows, inputCols);
-		outmul3 = Matrix.zeros(Wfh.rows, hiddenContext.cols);
-		outadd2 = Matrix.zeros(outmul2.rows, outmul3.cols);
-		outadd3 = Matrix.zeros(outadd2.rows, bf.cols);
-		outforgetGate = Matrix.zeros(outadd3.rows, outadd3.cols);		
-
-		outmul4 = Matrix.zeros(Wox.rows, inputCols);
-		outmul5 = Matrix.zeros(Woh.rows, hiddenContext.cols);
-		outadd4 = Matrix.zeros(outmul4.rows, outmul5.cols);
-		outadd5 = Matrix.zeros(outadd4.rows, bo.cols);
-		outputGate = Matrix.zeros(outadd5.rows, outadd5.cols);		
-
-		outmul6 = Matrix.zeros(Wcx.rows, inputCols);
-		outmul7 = Matrix.zeros(Wch.rows, hiddenContext.cols);
-		outadd6 = Matrix.zeros(outmul6.rows, outmul7.cols);
-		outadd7 = Matrix.zeros(outadd6.rows, bc.cols);
-		cellInput = Matrix.zeros(outadd7.rows, outadd7.cols);	
-		
-		outnonlin = Matrix.zeros(outinputGate.rows, outinputGate.cols);
-		retainCell = Matrix.zeros(cellInput.rows, cellInput.cols);
-		writeCell = Matrix.zeros(cellInput.rows, cellInput.cols);
-		cellAct = Matrix.zeros(writeCell.rows, writeCell.cols);
-		
-		output = Matrix.zeros(outputGate.rows, outputGate.cols);
-		
-	}
-	
 	public void prepareCuda()
 	{
 		
@@ -343,8 +321,21 @@ public class LstmLayer implements Model {
 	
 	@Override
 	public void resetState() {
-		resetToZero(hiddenContext); 
-		resetToZero(cellContext); 	
+		
+		for(int i = 0; i < hiddenContext.size(); i++)
+		{	
+		  hiddenContext.get(i).destroyMatrix(); 
+		  cellContext.get(i).destroyMatrix(); 	
+		}
+		
+		hiddenContext.clear();
+		cellContext.clear();
+		
+		hiddenContext.add(Matrix.zeros(outputDimension, inputCols));
+		cellContext.add(Matrix.zeros(outputDimension, inputCols));
+		
+		nsteps = 0;
+		
 	}
 	
 	
@@ -390,38 +381,16 @@ public class LstmLayer implements Model {
 		Wch.destroyMatrix();
 		bc.destroyMatrix();
 		
-		hiddenContext.destroyMatrix();
-		cellContext.destroyMatrix();
+		for(int i = 0; i < hiddenContext.size(); i++)
+		{	
+		  hiddenContext.get(i).destroyMatrix(); 
+		  cellContext.get(i).destroyMatrix(); 	
+		}
 		
-		outmul0.destroyMatrix();
-		outmul1.destroyMatrix();
-		outadd0.destroyMatrix();
-		outadd1.destroyMatrix();
-		outinputGate.destroyMatrix();
-
-		outmul2.destroyMatrix();
-		outmul3.destroyMatrix();
-		outadd2.destroyMatrix();
-		outadd3.destroyMatrix();
-		outforgetGate.destroyMatrix();		
-
-		outmul4.destroyMatrix();
-		outmul5.destroyMatrix();
-		outadd4.destroyMatrix();
-		outadd5.destroyMatrix();
-		outputGate.destroyMatrix();	
-
-		outmul6.destroyMatrix();
-		outmul7.destroyMatrix();
-		outadd6.destroyMatrix();
-		outadd7.destroyMatrix();
-		cellInput.destroyMatrix();
-		
-		retainCell.destroyMatrix();
-		writeCell.destroyMatrix();
-		cellAct.destroyMatrix();
-		outnonlin.destroyMatrix();
-		output.destroyMatrix();
+		for(int i = 0; i < lstmCells.size(); i++)
+		{	
+		  lstmCells.get(i).destroycell();
+		}
 				
 		
 	}
@@ -677,6 +646,107 @@ public class LstmLayer implements Model {
 	}
 
 
+	static class LstmCell {
+		
+		
+		int inputDimension;
+		int outputDimension;
+		int inputCols;
+		
+		Matrix outmul0, outmul1, outadd0, outadd1, outinputGate;
+		Matrix outmul2, outmul3, outadd2, outadd3, outforgetGate;
+		Matrix outmul4, outmul5, outadd4, outadd5, outputGate;
+		Matrix outmul6, outmul7, outadd6, outadd7, cellInput;
+		Matrix retainCell, writeCell, cellAct;
+		Matrix outnonlin, output; 
+
+		
+		public void createCell(int inputDimension, int outputDimension, int inputCols)
+		{
+		    this.inputDimension = inputDimension;
+			this.outputDimension = outputDimension;
+			this.inputCols = inputCols;
+		    
+			outmul0 = Matrix.zeros(outputDimension, inputCols);
+			outmul1 = Matrix.zeros(outputDimension, inputCols);
+			outadd0 = Matrix.zeros(outmul0.rows, outmul1.cols);
+			outadd1 = Matrix.zeros(outadd0.rows, inputCols);
+			outinputGate = Matrix.zeros(outadd1.rows, outadd1.cols);
 	
+			outmul2 = Matrix.zeros(outputDimension, inputCols);
+			outmul3 = Matrix.zeros(outputDimension, inputCols);
+			outadd2 = Matrix.zeros(outmul2.rows, outmul3.cols);
+			outadd3 = Matrix.zeros(outadd2.rows, inputCols);
+			outforgetGate = Matrix.zeros(outadd3.rows, outadd3.cols);		
+	
+			outmul4 = Matrix.zeros(outputDimension, inputCols);
+			outmul5 = Matrix.zeros(outputDimension, inputCols);
+			outadd4 = Matrix.zeros(outmul4.rows, outmul5.cols);
+			outadd5 = Matrix.zeros(outadd4.rows, inputCols);
+			outputGate = Matrix.zeros(outadd5.rows, outadd5.cols);		
+	
+			outmul6 = Matrix.zeros(outputDimension, inputCols);
+			outmul7 = Matrix.zeros(outputDimension, inputCols);
+			outadd6 = Matrix.zeros(outmul6.rows, outmul7.cols);
+			outadd7 = Matrix.zeros(outadd6.rows, inputCols);
+			cellInput = Matrix.zeros(outadd7.rows, outadd7.cols);	
+			
+			outnonlin = Matrix.zeros(outinputGate.rows, outinputGate.cols);
+			retainCell = Matrix.zeros(cellInput.rows, cellInput.cols);
+			writeCell = Matrix.zeros(cellInput.rows, cellInput.cols);
+			cellAct = Matrix.zeros(writeCell.rows, writeCell.cols);
+			
+			output = Matrix.zeros(outputGate.rows, outputGate.cols);
+			
+		}
+		
+		public static LstmCell zeros(int id, int od, int ic)
+		{
+			LstmCell cell = new LstmCell();
+			cell.createCell(id, od, ic);
+			return cell;
+		}
+		
+		public void resetCell()
+		{
+			
+		}
+		
+		
+		public void destroycell()
+		{
+			outmul0.destroyMatrix();
+			outmul1.destroyMatrix();
+			outadd0.destroyMatrix();
+			outadd1.destroyMatrix();
+			outinputGate.destroyMatrix();
+
+			outmul2.destroyMatrix();
+			outmul3.destroyMatrix();
+			outadd2.destroyMatrix();
+			outadd3.destroyMatrix();
+			outforgetGate.destroyMatrix();		
+
+			outmul4.destroyMatrix();
+			outmul5.destroyMatrix();
+			outadd4.destroyMatrix();
+			outadd5.destroyMatrix();
+			outputGate.destroyMatrix();	
+
+			outmul6.destroyMatrix();
+			outmul7.destroyMatrix();
+			outadd6.destroyMatrix();
+			outadd7.destroyMatrix();
+			cellInput.destroyMatrix();
+			
+			retainCell.destroyMatrix();
+			writeCell.destroyMatrix();
+			cellAct.destroyMatrix();
+			outnonlin.destroyMatrix();
+			output.destroyMatrix();	
+		}
+		
+		
+	}
 	
 }

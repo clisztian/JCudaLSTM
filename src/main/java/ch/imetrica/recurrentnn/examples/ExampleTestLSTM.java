@@ -4,6 +4,7 @@ import static jcuda.jcurand.JCurand.curandCreateGenerator;
 import static jcuda.jcurand.JCurand.curandSetPseudoRandomGeneratorSeed;
 import static jcuda.jcurand.curandRngType.CURAND_RNG_PSEUDO_DEFAULT;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 
@@ -12,8 +13,6 @@ import ch.imetrica.recurrentnn.loss.Loss;
 import ch.imetrica.recurrentnn.loss.LossMultiDimensionalBinary;
 import ch.imetrica.recurrentnn.loss.LossSumOfSquares;
 import ch.imetrica.recurrentnn.matrix.Matrix;
-import ch.imetrica.recurrentnn.model.LstmLayer;
-import ch.imetrica.recurrentnn.model.Model;
 import ch.imetrica.recurrentnn.model.NeuralNetwork;
 import ch.imetrica.recurrentnn.model.Nonlinearity;
 import ch.imetrica.recurrentnn.model.SigmoidUnit;
@@ -42,11 +41,21 @@ public class ExampleTestLSTM {
 		
 		double[] samp = new double[inputDimension];
 		double[] target = new double[outputDimension];
-		
 		samp[1] = 1.0; target[5] = 1.0;
-		
 		Matrix input = new Matrix(samp);
 		Matrix targetOutput = new Matrix(target);
+		
+		double[] samp2 = new double[inputDimension];
+		double[] target2 = new double[outputDimension];
+		samp2[0] = 1.0; target2[2] = 1.0;
+		Matrix input1 = new Matrix(samp2);
+		Matrix targetOutput1 = new Matrix(target2);
+		
+        List<Matrix> inputs = new ArrayList<>();
+        inputs.add(input); inputs.add(input1);
+		
+        List<Matrix> targets = new ArrayList<>();
+        targets.add(targetOutput); targets.add(targetOutput1);
 		
 
 		int hiddenDimension = 7;
@@ -67,16 +76,31 @@ public class ExampleTestLSTM {
 				initParamsStdDev, r);
 		
 
-		nn.resetState();
-		nn.forward_ff(input, g);
+		//WWnn.resetState();
+		
+		for(int i = 0; i < 2; i++)
+		{
+		 
+			nn.forward_ff(inputs.get(i), g);	
+		 //nn.forward_ff(input, g);
+		
+		 nn.getOutput().printMatrix();
+		
+		 double loss = lossReporting.measure(nn.getOutput(), targets.get(i));
+		 //double loss = lossReporting.measure(nn.getOutput(), targetOutput);
+	     System.out.println("Loss = " + loss);
 			
+		 lossTraining.backward(nn.getOutput(), targets.get(i));
+		}
+		
+		
+		
 		
 		//nn.getOutput().printMatrix();
 		
-		double loss = lossReporting.measure(nn.getOutput(), targetOutput);
 		//System.out.println("Loss = " + loss);
 		
-		lossTraining.backward(nn.getOutput(), targetOutput);
+
 		//nn.getOutput().printMatrixDW();
 		
         g.backward(); 
@@ -85,13 +109,7 @@ public class ExampleTestLSTM {
         //temp.printOutputWih();
         
         
-//        List<Matrix> params = nn.getParameters();
-//
-//        for(int i = 0; i < params.size(); i++)
-//        {
-//        	System.out.println("Parameters " + i);
-//        	params.get(i).printMatrixDW();
-//        }
+
         
  
         
@@ -99,6 +117,15 @@ public class ExampleTestLSTM {
         train.updateModelParams(nn, learningRate);
 
 
+        List<Matrix> params = nn.getParameters();
+
+        for(int i = 0; i < params.size(); i++)
+        {
+        	System.out.println("Parameters " + i);
+        	params.get(i).printMatrix();
+        }
+        
+        
         
         
 		System.out.println("done.");
@@ -106,6 +133,12 @@ public class ExampleTestLSTM {
 		nn.deleteParameters();
 		input.destroyMatrix();
 		targetOutput.destroyMatrix();
+//		for(int i = 0; i < inputs.size(); i++)
+//		{
+//			inputs.get(i).destroyMatrix();
+//			targets.get(i).destroyMatrix();
+//		}
+		
 		
 		
 	}
