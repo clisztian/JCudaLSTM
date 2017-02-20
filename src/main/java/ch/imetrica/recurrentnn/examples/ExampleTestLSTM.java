@@ -6,8 +6,6 @@ import static jcuda.jcurand.curandRngType.CURAND_RNG_PSEUDO_DEFAULT;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Random;
-
 import ch.imetrica.recurrentnn.autodiff.Graph;
 import ch.imetrica.recurrentnn.loss.Loss;
 import ch.imetrica.recurrentnn.loss.LossMultiDimensionalBinary;
@@ -28,7 +26,6 @@ public class ExampleTestLSTM {
 	@SuppressWarnings("static-access")
 	public static void main(String[] args) throws Exception {
 
-		Random rng = new Random();
 		boolean applyTraining = true;
 		Graph g = new Graph(applyTraining);
 		

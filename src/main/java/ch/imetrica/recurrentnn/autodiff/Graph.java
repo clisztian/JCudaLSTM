@@ -41,6 +41,7 @@ import jcuda.driver.CUdevice;
 import jcuda.driver.CUfunction;
 import jcuda.driver.CUmodule;
 import jcuda.driver.JCudaDriver;
+import jcuda.jcublas.JCublas;
 import jcuda.jcublas.cublasHandle;
 import jcuda.jcurand.curandGenerator;
 import jcuda.nvrtc.JNvrtc;
@@ -426,6 +427,8 @@ public class Graph {
 				public void run() {
 				
 
+					Graph.printPointer(m1.size, m1.dw);
+					Graph.printPointer(m2.size, m2.dw);
 					
 					matrixmultdw2(m2.rows, m2.cols, out.rows, m2.w, out.dw, m1.dw);
 					matrixmultdw1(m1.cols, m1.rows, out.cols, m1.w, out.dw, m2.dw);	
@@ -468,17 +471,18 @@ public class Graph {
 		Pointer temp = new Pointer();
 		
 		cudaMalloc(temp, hA*wB*Sizeof.DOUBLE);
+		JCublas.cublasDcopy(hA*wB, out, 1, temp, 1);		
 
-	    cublasDgemm(handle, CUBLAS_OP_T, CUBLAS_OP_N, hA, wB, wA, one, dA, wA, dB, wA, zero, temp, hA);
+	    cublasDgemm(handle, CUBLAS_OP_T, CUBLAS_OP_N, hA, wB, wA, one, dA, wA, dB, wA, one, temp, hA);
 	    cublasDgeam(handle, CUBLAS_OP_T, CUBLAS_OP_T, wB, hA, one, temp, hA, zero, temp, hA, out, wB);   
+	    //cublasDgeam(handle, CUBLAS_OP_T, CUBLAS_OP_T, wB, hA, one, temp, hA, one, out, hA, out, wB);   
 	    
 	    cudaFree(temp);	    
 	}
 
 	public void matrixmultdw1(int hA, int wA, int wB, Pointer dA, Pointer dB, Pointer out)
 	{
-		Pointer zero = Pointer.to(new double[]{ 0.0 });
-        Pointer one = Pointer.to(new double[]{ 1.0 }); 
+		Pointer one = Pointer.to(new double[]{ 1.0 }); 
         //Pointer temp = new Pointer();
         
         //cudaMalloc(temp, hA*wB*Sizeof.DOUBLE);

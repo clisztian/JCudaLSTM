@@ -8,6 +8,7 @@ import static jcuda.jcublas.JCublas2.cublasCreate;
 import jcuda.jcublas.JCublas;
 import java.io.IOException;
 
+import ch.imetrica.recurrentnn.autodiff.Graph;
 import ch.imetrica.recurrentnn.matrix.Matrix;
 import jcuda.Pointer;
 import jcuda.driver.CUfunction;
@@ -59,6 +60,9 @@ public class LossSumOfSquares implements Loss {
 	@Override
 	public void backward(Matrix actualOutput, Matrix targetOutput) throws Exception {
 		backwardError(actualOutput.size, actualOutput.w, targetOutput.w, actualOutput.dw);
+		
+		System.out.println("Backward error...");
+		Graph.printPointer(actualOutput.size, actualOutput.dw);
 	}
 	
 	@Override
