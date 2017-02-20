@@ -44,13 +44,20 @@ public class FeedForwardLayer implements Model {
 	private CUmodule module; 
 	private CUfunction function;
 	
+	int outputDimension;
+	int inputDimension;
+	int nstep = 0;
+	
 	Matrix W;
 	Matrix b;
 	Nonlinearity f;
 	
-	Matrix outmul; 
-	Matrix outsum;
-	Matrix outnonlin;
+//	Matrix outmul; 
+//	Matrix outsum;
+//	Matrix outnonlin;
+	
+	List<FFCell> ffCell;
+	
 	
 	private static String updateSourceCode = 
 	"extern \"C\"" + "\n" +
@@ -84,21 +91,24 @@ public class FeedForwardLayer implements Model {
 	
 	public FeedForwardLayer(int inputDimension, int outputDimension, Nonlinearity f, double initParamsStdDev, curandGenerator rng, int seed) {
 
+		this.outputDimension = outputDimension; 
+		this.inputDimension = inputDimension;
+		
 		curandSetPseudoRandomGeneratorSeed(rng, seed);
 		W = Matrix.rand(outputDimension, inputDimension, initParamsStdDev, rng);
 		b = Matrix.zeros(outputDimension);
 		this.f = f;
 
-		setupOutMatrices();
+		
+		ffCell = new ArrayList<FFCell>();
+		ffCell.add(FFCell.zeros(inputDimension, outputDimension, b.cols));
+		
+		
+		nstep = 0;
 		prepare();		
 	}
 	
-	public void setupOutMatrices()
-	{
-		outmul = Matrix.zeros(W.rows, b.cols);
-		outsum = Matrix.zeros(outmul.rows, outmul.cols);
-		outnonlin = Matrix.zeros(outsum.rows, outsum.cols);
-	}
+
 	
 	
 	
@@ -125,11 +135,18 @@ public class FeedForwardLayer implements Model {
 		return g.nonlin(f, sum);		
 	}
 	
+	
+	@Override
 	public void static_forward(Matrix input, Graph g) throws Exception {
 		
-		g.mul(W, input, outmul);
-		g.add(outmul, b, outsum);
-		g.nonlin(f, outsum, outnonlin);	
+		if(nstep == ffCell.size())
+		{ffCell.add(FFCell.zeros(inputDimension, outputDimension, b.cols));}
+		
+		g.mul(W, input, ffCell.get(nstep).outmul);
+		g.add(ffCell.get(nstep).outmul, b, ffCell.get(nstep).outsum);
+		g.nonlin(f, ffCell.get(nstep).outsum, ffCell.get(nstep).outnonlin);	
+		
+		nstep++;
 	}	
 	
 
@@ -160,9 +177,11 @@ public class FeedForwardLayer implements Model {
 	@Override
 	public void resetState() {
 
-		resetToZero(outmul);
-		resetToZero(outsum);
-		resetToZero(outnonlin);
+	   for(int i = 0; i < ffCell.size(); i++)
+	   {
+		ffCell.get(i).resetCell(function, module);
+	   }
+	   nstep = 0;
 	}
 
 	@Override
@@ -234,9 +253,11 @@ public class FeedForwardLayer implements Model {
 		W.destroyMatrix();
 		b.destroyMatrix();
 		
-		outmul.destroyMatrix(); 
-		outsum.destroyMatrix();
-		outnonlin.destroyMatrix();
+		for(int i = 0; i < ffCell.size(); i++)
+		{
+			ffCell.get(i).destroycell();
+		}
+		ffCell.clear();
 	}
 	
 	public static void printParameters(List<FeedForwardLayer> layers)
@@ -252,14 +273,11 @@ public class FeedForwardLayer implements Model {
     	layers.get(0).static_forward(input, g);
     	
 		for (int i = 1; i < layers.size(); i++) {
-			layers.get(i).static_forward(layers.get(i-1).outnonlin, g);
+			layers.get(i).static_forward(layers.get(i-1).getOutput(), g);
 		}
 	}
 	
-	public static void setInputFirstLayer(FeedForwardLayer layer, Matrix input) throws Exception
-	{
-		layer.outnonlin.copy(input);
-	}
+
 	
 	public static void resetState(List<FeedForwardLayer> layers)
 	{
@@ -269,7 +287,7 @@ public class FeedForwardLayer implements Model {
 	}
 	
 	public static Matrix getOutput(List<FeedForwardLayer> layers) {
-		return layers.get(layers.size() - 1).outnonlin;
+		return layers.get(layers.size() - 1).getOutput();
 	}
 	
     public static void deleteNetwork(List<FeedForwardLayer> layers) {
@@ -496,7 +514,7 @@ public class FeedForwardLayer implements Model {
         
         System.out.println("Construct forward feed...");
 		FeedForwardLayer ffl = new FeedForwardLayer(inputDimension, outputDimension, fInputGate, initParamsStdDev, rng, 10);
-		ffl.setupOutMatrices();
+		
 		
 		
 		try{
@@ -506,12 +524,15 @@ public class FeedForwardLayer implements Model {
 			ffl.static_forward(input, g);
 			
 //			Matrix out = ffl.forward(input, g);
-			double[] output = new double[ffl.outnonlin.size];
-			
-			Matrix targetOutput = new Matrix(ffl.outnonlin.size, 1);
+			int size = ffl.getOutput().size;
+		
+			double[] output = new double[size];			
+			Matrix targetOutput = new Matrix(size, 1);
 			targetOutput.rand(1.0, rng);
+			Matrix outnonlin = ffl.getOutput();
 			
-			cudaMemcpy(Pointer.to(output), ffl.outnonlin.w, ffl.outnonlin.size * Sizeof.DOUBLE, cudaMemcpyDeviceToHost);
+			
+			cudaMemcpy(Pointer.to(output), outnonlin.w, size * Sizeof.DOUBLE, cudaMemcpyDeviceToHost);
 			
 			for(int i = 0; i < output.length; i++)
 			{
@@ -519,10 +540,10 @@ public class FeedForwardLayer implements Model {
 			}
 			
 			
-			double loss = lossReporting.measure(ffl.outnonlin, targetOutput);
+			double loss = lossReporting.measure(outnonlin, targetOutput);
 			System.out.println("Loss values = " + loss);
 			
-			lossReporting.backward(ffl.outnonlin, targetOutput);
+			lossReporting.backward(outnonlin, targetOutput);
 			
 			System.out.println("Before update....");
 			double[] bdw = new double[ffl.b.size];
@@ -616,6 +637,83 @@ public class FeedForwardLayer implements Model {
 
 	@Override
 	public Matrix getOutput() {
-		return outnonlin;
+		return ffCell.get(ffCell.size() - 1).outnonlin;
 	}
+	
+	
+    static class FFCell {
+		
+		
+		int inputDimension;
+		int outputDimension;
+		int inputCols;
+		
+		Matrix outmul; 
+		Matrix outsum;
+		Matrix outnonlin;
+
+		
+		public void createCell(int inputDimension, int outputDimension, int inputCols)
+		{
+		    this.inputDimension = inputDimension;
+			this.outputDimension = outputDimension;
+			this.inputCols = inputCols;
+			
+			outmul = Matrix.zeros(outputDimension, inputCols);
+			outsum = Matrix.zeros(outmul.rows, outmul.cols);
+			outnonlin = Matrix.zeros(outsum.rows, outsum.cols);
+
+		}
+		
+		public static FFCell zeros(int id, int od, int ic)
+		{
+			FFCell cell = new FFCell();
+			cell.createCell(id, od, ic);
+			return cell;
+		}
+		
+		public void resetCell(CUfunction function, CUmodule module)
+		{
+			
+			cuModuleGetFunction(function, module, "reset_zero_all");
+	        Pointer kernelParameters = Pointer.to(
+	            Pointer.to(new int[]{outmul.size}),
+	            Pointer.to(outmul.w),
+	            Pointer.to(outmul.dw),
+	            Pointer.to(outmul.stepCache),
+	            Pointer.to(outsum.w),
+	            Pointer.to(outsum.dw),
+	            Pointer.to(outsum.stepCache),
+	            Pointer.to(outnonlin.w),
+	            Pointer.to(outnonlin.dw),
+	            Pointer.to(outnonlin.stepCache)
+	        );
+	                
+	        int blockSizeX = 256;
+	        int gridSizeX = (outmul.size + blockSizeX - 1) / blockSizeX;
+	        cuLaunchKernel(function,
+	          gridSizeX,  1, 1,      // Grid dimension
+	          blockSizeX, 1, 1,      // Block dimension
+	          0, null,               // Shared memory size and stream
+	          kernelParameters, null // Kernel-
+	        );
+	        
+	        cuCtxSynchronize();	
+		}
+		
+		
+		public void destroycell()
+		{
+			outsum.destroyMatrix();
+			outmul.destroyMatrix();
+			outnonlin.destroyMatrix();			
+		}
+		
+		
+		
+
+	}
+	
+	
+	
 }

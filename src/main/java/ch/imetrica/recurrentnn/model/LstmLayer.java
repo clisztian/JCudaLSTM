@@ -150,10 +150,7 @@ public class LstmLayer implements Model {
 		cellContext.add(Matrix.zeros(outputDimension, inputCols));
 		
 		lstmCells = new ArrayList<LstmCell>();
-		
-		hiddenContent = Matrix.zeros(outputDimension, inputCols);
-		cellContent = Matrix.zeros(outputDimension, inputCols);
-		//lstmCells.add(LstmCell.zeros(inputDimension, outputDimension, inputCols));
+		lstmCells.add(LstmCell.zeros(inputDimension, outputDimension, inputCols));
 		
 		nsteps = 0;
 	}
@@ -215,31 +212,29 @@ public class LstmLayer implements Model {
 	public void static_forward(Matrix input, Graph g) throws Exception 
 	{
 		
-//		if(nsteps == lstmCells.size()) 
-//		{lstmCells.add(LstmCell.zeros(inputDimension, outputDimension, inputCols));}
-		
-		lstmCells.add(LstmCell.zeros(inputDimension, outputDimension, inputCols));
-			
+		if(nsteps == lstmCells.size()) 
+		{lstmCells.add(LstmCell.zeros(inputDimension, outputDimension, inputCols));}
+					
 		g.mul(Wix, input, lstmCells.get(nsteps).outmul0);
-		g.mul(Wih, hiddenContent, lstmCells.get(nsteps).outmul1);
+		g.mul(Wih, hiddenContext.get(nsteps), lstmCells.get(nsteps).outmul1);
 		g.add(lstmCells.get(nsteps).outmul0, lstmCells.get(nsteps).outmul1, lstmCells.get(nsteps).outadd0);
 		g.add(lstmCells.get(nsteps).outadd0, bi, lstmCells.get(nsteps).outadd1);
 		g.nonlin(fInputGate, lstmCells.get(nsteps).outadd1, lstmCells.get(nsteps).outinputGate);
 	
 		g.mul(Wfx, input, lstmCells.get(nsteps).outmul2);
-		g.mul(Wfh, hiddenContent, lstmCells.get(nsteps).outmul3);
+		g.mul(Wfh, hiddenContext.get(nsteps), lstmCells.get(nsteps).outmul3);
 		g.add(lstmCells.get(nsteps).outmul2, lstmCells.get(nsteps).outmul3, lstmCells.get(nsteps).outadd2);
 		g.add(lstmCells.get(nsteps).outadd2, bf, lstmCells.get(nsteps).outadd3);
 		g.nonlin(fForgetGate, lstmCells.get(nsteps).outadd3, lstmCells.get(nsteps).outforgetGate);	
 	
 		g.mul(Wox, input, lstmCells.get(nsteps).outmul4);
-		g.mul(Woh, hiddenContent, lstmCells.get(nsteps).outmul5);
+		g.mul(Woh, hiddenContext.get(nsteps), lstmCells.get(nsteps).outmul5);
 		g.add(lstmCells.get(nsteps).outmul4, lstmCells.get(nsteps).outmul5, lstmCells.get(nsteps).outadd4);
 		g.add(lstmCells.get(nsteps).outadd4, bo, lstmCells.get(nsteps).outadd5);
 		g.nonlin(fOutputGate, lstmCells.get(nsteps).outadd5, lstmCells.get(nsteps).outputGate);	
 		
 		g.mul(Wcx, input, lstmCells.get(nsteps).outmul6);
-		g.mul(Wch, hiddenContent, lstmCells.get(nsteps).outmul7);
+		g.mul(Wch, hiddenContext.get(nsteps), lstmCells.get(nsteps).outmul7);
 		g.add(lstmCells.get(nsteps).outmul6, lstmCells.get(nsteps).outmul7, lstmCells.get(nsteps).outadd6);
 		g.add(lstmCells.get(nsteps).outadd6, bc, lstmCells.get(nsteps).outadd7);
 		g.nonlin(fCellInput, lstmCells.get(nsteps).outadd7, lstmCells.get(nsteps).cellInput);	
@@ -251,9 +246,7 @@ public class LstmLayer implements Model {
 		g.nonlin(fCellOutput, lstmCells.get(nsteps).cellAct, lstmCells.get(nsteps).outnonlin);				
 		g.elmul(lstmCells.get(nsteps).outputGate, lstmCells.get(nsteps).outnonlin, lstmCells.get(nsteps).output);
 				
-		hiddenContent = lstmCells.get(nsteps).output;
-		cellContent = lstmCells.get(nsteps).cellAct;
-		
+
 		hiddenContext.add(Matrix.copyMatrix(lstmCells.get(nsteps).output));
 		cellContext.add(Matrix.copyMatrix(lstmCells.get(nsteps).cellAct));
 

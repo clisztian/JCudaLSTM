@@ -263,8 +263,6 @@ public class Matrix implements Serializable {
     public void rand(double initParamsStdDev, curandGenerator generator) 
     {
     	
-    	double mean = 0.0; 
-    
     	double hostData[] = new double[this.size];
 	    Arrays.fill(hostData,  .2*initParamsStdDev);
 	    

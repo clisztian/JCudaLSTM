@@ -79,15 +79,12 @@ public class ExampleTestLSTM {
 		{
 		 
 			nn.forward_ff(inputs.get(i), g);	
-		 //nn.forward_ff(input, g);
-		
-		 nn.getOutput().printMatrix();
-		
-		 double loss = lossReporting.measure(nn.getOutput(), targets.get(i));
-		 //double loss = lossReporting.measure(nn.getOutput(), targetOutput);
-	     System.out.println("Loss = " + loss);
+			nn.getOutput().printMatrix();
 			
-		 lossTraining.backward(nn.getOutput(), targets.get(i));
+			double loss = lossReporting.measure(nn.getOutput(), targets.get(i));
+			System.out.println("Loss = " + loss);
+			
+			lossTraining.backward(nn.getOutput(), targets.get(i));
 		}
 		
 		
