@@ -29,7 +29,10 @@ public class NeuralNetwork implements Model {
 	@Override
 	public void static_forward(Matrix input, Graph g) throws Exception 
 	{
-		
+        layers.get(0).static_forward(input, g);  	
+		for (int i = 1; i < layers.size(); i++) {
+			layers.get(i).static_forward(layers.get(i-1).getOutput(), g);
+		}
 	}
 	
 	

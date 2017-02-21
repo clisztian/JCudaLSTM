@@ -427,6 +427,8 @@ public class Graph {
 				public void run() {
 				
 					
+					Graph.printPointer(m2.size, m2.dw);
+					
 					matrixmultdw2(m2.rows, m2.cols, out.rows, m2.w, out.dw, m1.dw);
 					matrixmultdw1(m1.cols, m1.rows, out.cols, m1.w, out.dw, m2.dw);	
 					

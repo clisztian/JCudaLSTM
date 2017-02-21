@@ -122,4 +122,174 @@ BB1_2:
 	ret;
 }
 
+	// .globl	reset_zero_all
+.visible .entry reset_zero_all(
+	.param .u32 reset_zero_all_param_0,
+	.param .u64 reset_zero_all_param_1,
+	.param .u64 reset_zero_all_param_2,
+	.param .u64 reset_zero_all_param_3,
+	.param .u64 reset_zero_all_param_4,
+	.param .u64 reset_zero_all_param_5,
+	.param .u64 reset_zero_all_param_6,
+	.param .u64 reset_zero_all_param_7,
+	.param .u64 reset_zero_all_param_8,
+	.param .u64 reset_zero_all_param_9
+)
+{
+	.reg .pred 	%p<2>;
+	.reg .b32 	%r<6>;
+	.reg .b64 	%rd<30>;
+
+
+	ld.param.u32 	%r2, [reset_zero_all_param_0];
+	ld.param.u64 	%rd1, [reset_zero_all_param_1];
+	ld.param.u64 	%rd2, [reset_zero_all_param_2];
+	ld.param.u64 	%rd3, [reset_zero_all_param_3];
+	ld.param.u64 	%rd4, [reset_zero_all_param_4];
+	ld.param.u64 	%rd5, [reset_zero_all_param_5];
+	ld.param.u64 	%rd6, [reset_zero_all_param_6];
+	ld.param.u64 	%rd7, [reset_zero_all_param_7];
+	ld.param.u64 	%rd8, [reset_zero_all_param_8];
+	ld.param.u64 	%rd9, [reset_zero_all_param_9];
+	mov.u32 	%r3, %ctaid.x;
+	mov.u32 	%r4, %ntid.x;
+	mov.u32 	%r5, %tid.x;
+	mad.lo.s32 	%r1, %r4, %r3, %r5;
+	setp.ge.s32	%p1, %r1, %r2;
+	@%p1 bra 	BB2_2;
+
+	cvta.to.global.u64 	%rd10, %rd1;
+	mul.wide.s32 	%rd11, %r1, 8;
+	add.s64 	%rd12, %rd10, %rd11;
+	mov.u64 	%rd13, 0;
+	st.global.u64 	[%rd12], %rd13;
+	cvta.to.global.u64 	%rd14, %rd2;
+	add.s64 	%rd15, %rd14, %rd11;
+	st.global.u64 	[%rd15], %rd13;
+	cvta.to.global.u64 	%rd16, %rd3;
+	add.s64 	%rd17, %rd16, %rd11;
+	st.global.u64 	[%rd17], %rd13;
+	cvta.to.global.u64 	%rd18, %rd4;
+	add.s64 	%rd19, %rd18, %rd11;
+	st.global.u64 	[%rd19], %rd13;
+	cvta.to.global.u64 	%rd20, %rd5;
+	add.s64 	%rd21, %rd20, %rd11;
+	st.global.u64 	[%rd21], %rd13;
+	cvta.to.global.u64 	%rd22, %rd6;
+	add.s64 	%rd23, %rd22, %rd11;
+	st.global.u64 	[%rd23], %rd13;
+	cvta.to.global.u64 	%rd24, %rd7;
+	add.s64 	%rd25, %rd24, %rd11;
+	st.global.u64 	[%rd25], %rd13;
+	cvta.to.global.u64 	%rd26, %rd8;
+	add.s64 	%rd27, %rd26, %rd11;
+	st.global.u64 	[%rd27], %rd13;
+	cvta.to.global.u64 	%rd28, %rd9;
+	add.s64 	%rd29, %rd28, %rd11;
+	st.global.u64 	[%rd29], %rd13;
+
+BB2_2:
+	ret;
+}
+
+	// .globl	reset_zero_lstm
+.visible .entry reset_zero_lstm(
+	.param .u32 reset_zero_lstm_param_0,
+	.param .u64 reset_zero_lstm_param_1,
+	.param .u64 reset_zero_lstm_param_2,
+	.param .u64 reset_zero_lstm_param_3,
+	.param .u64 reset_zero_lstm_param_4,
+	.param .u64 reset_zero_lstm_param_5,
+	.param .u64 reset_zero_lstm_param_6,
+	.param .u64 reset_zero_lstm_param_7,
+	.param .u64 reset_zero_lstm_param_8,
+	.param .u64 reset_zero_lstm_param_9,
+	.param .u64 reset_zero_lstm_param_10,
+	.param .u64 reset_zero_lstm_param_11,
+	.param .u64 reset_zero_lstm_param_12,
+	.param .u64 reset_zero_lstm_param_13,
+	.param .u64 reset_zero_lstm_param_14,
+	.param .u64 reset_zero_lstm_param_15
+)
+{
+	.reg .pred 	%p<2>;
+	.reg .b32 	%r<6>;
+	.reg .b64 	%rd<48>;
+
+
+	ld.param.u32 	%r2, [reset_zero_lstm_param_0];
+	ld.param.u64 	%rd1, [reset_zero_lstm_param_1];
+	ld.param.u64 	%rd2, [reset_zero_lstm_param_2];
+	ld.param.u64 	%rd3, [reset_zero_lstm_param_3];
+	ld.param.u64 	%rd4, [reset_zero_lstm_param_4];
+	ld.param.u64 	%rd5, [reset_zero_lstm_param_5];
+	ld.param.u64 	%rd6, [reset_zero_lstm_param_6];
+	ld.param.u64 	%rd7, [reset_zero_lstm_param_7];
+	ld.param.u64 	%rd8, [reset_zero_lstm_param_8];
+	ld.param.u64 	%rd9, [reset_zero_lstm_param_9];
+	ld.param.u64 	%rd10, [reset_zero_lstm_param_10];
+	ld.param.u64 	%rd11, [reset_zero_lstm_param_11];
+	ld.param.u64 	%rd12, [reset_zero_lstm_param_12];
+	ld.param.u64 	%rd13, [reset_zero_lstm_param_13];
+	ld.param.u64 	%rd14, [reset_zero_lstm_param_14];
+	ld.param.u64 	%rd15, [reset_zero_lstm_param_15];
+	mov.u32 	%r3, %ctaid.x;
+	mov.u32 	%r4, %ntid.x;
+	mov.u32 	%r5, %tid.x;
+	mad.lo.s32 	%r1, %r4, %r3, %r5;
+	setp.ge.s32	%p1, %r1, %r2;
+	@%p1 bra 	BB3_2;
+
+	cvta.to.global.u64 	%rd16, %rd1;
+	mul.wide.s32 	%rd17, %r1, 8;
+	add.s64 	%rd18, %rd16, %rd17;
+	mov.u64 	%rd19, 0;
+	st.global.u64 	[%rd18], %rd19;
+	cvta.to.global.u64 	%rd20, %rd2;
+	add.s64 	%rd21, %rd20, %rd17;
+	st.global.u64 	[%rd21], %rd19;
+	cvta.to.global.u64 	%rd22, %rd3;
+	add.s64 	%rd23, %rd22, %rd17;
+	st.global.u64 	[%rd23], %rd19;
+	cvta.to.global.u64 	%rd24, %rd4;
+	add.s64 	%rd25, %rd24, %rd17;
+	st.global.u64 	[%rd25], %rd19;
+	cvta.to.global.u64 	%rd26, %rd5;
+	add.s64 	%rd27, %rd26, %rd17;
+	st.global.u64 	[%rd27], %rd19;
+	cvta.to.global.u64 	%rd28, %rd6;
+	add.s64 	%rd29, %rd28, %rd17;
+	st.global.u64 	[%rd29], %rd19;
+	cvta.to.global.u64 	%rd30, %rd7;
+	add.s64 	%rd31, %rd30, %rd17;
+	st.global.u64 	[%rd31], %rd19;
+	cvta.to.global.u64 	%rd32, %rd8;
+	add.s64 	%rd33, %rd32, %rd17;
+	st.global.u64 	[%rd33], %rd19;
+	cvta.to.global.u64 	%rd34, %rd9;
+	add.s64 	%rd35, %rd34, %rd17;
+	st.global.u64 	[%rd35], %rd19;
+	cvta.to.global.u64 	%rd36, %rd10;
+	add.s64 	%rd37, %rd36, %rd17;
+	st.global.u64 	[%rd37], %rd19;
+	cvta.to.global.u64 	%rd38, %rd11;
+	add.s64 	%rd39, %rd38, %rd17;
+	st.global.u64 	[%rd39], %rd19;
+	cvta.to.global.u64 	%rd40, %rd12;
+	add.s64 	%rd41, %rd40, %rd17;
+	st.global.u64 	[%rd41], %rd19;
+	cvta.to.global.u64 	%rd42, %rd13;
+	add.s64 	%rd43, %rd42, %rd17;
+	st.global.u64 	[%rd43], %rd19;
+	cvta.to.global.u64 	%rd44, %rd14;
+	add.s64 	%rd45, %rd44, %rd17;
+	st.global.u64 	[%rd45], %rd19;
+	cvta.to.global.u64 	%rd46, %rd15;
+	add.s64 	%rd47, %rd46, %rd17;
+	st.global.u64 	[%rd47], %rd19;
+
+BB3_2:
+	ret;
+}
+
 
