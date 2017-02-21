@@ -162,8 +162,6 @@ public class Trainer {
 					}
 				}
 			}
-			List<DataSequence> thisSequence = new ArrayList<>();
-			thisSequence.add(seq);
 			if (applyTraining) {
 				g.backward(); //backprop dw values
 				updateModelParams(model, learningRate); //update params

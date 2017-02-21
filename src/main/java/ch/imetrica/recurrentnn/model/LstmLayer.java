@@ -7,6 +7,7 @@ import static jcuda.driver.JCudaDriver.cuDeviceGet;
 import static jcuda.driver.JCudaDriver.cuInit;
 import static jcuda.driver.JCudaDriver.cuLaunchKernel;
 import static jcuda.driver.JCudaDriver.cuModuleGetFunction;
+import static jcuda.driver.JCudaDriver.cuModuleLoad;
 import static jcuda.driver.JCudaDriver.cuModuleLoadData;
 import static jcuda.jcurand.JCurand.curandCreateGenerator;
 import static jcuda.jcurand.JCurand.curandSetPseudoRandomGeneratorSeed;
@@ -17,6 +18,7 @@ import static jcuda.nvrtc.JNvrtc.nvrtcDestroyProgram;
 import static jcuda.nvrtc.JNvrtc.nvrtcGetPTX;
 import static jcuda.nvrtc.JNvrtc.nvrtcGetProgramLog;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
@@ -57,14 +59,14 @@ public class LstmLayer implements Model {
 	Matrix Wox, Woh, bo;
 	Matrix Wcx, Wch, bc;
 	
-	List<Matrix> hiddenContext;
-	List<Matrix> cellContext;
 
 	Matrix hiddenContent;
 	Matrix cellContent;
 	
-	List<LstmCell> lstmCells;
+	Matrix hidden0;
+	Matrix cell0;
 	
+	List<LstmCell> lstmCells;
 		
 	Nonlinearity fInputGate;
 	Nonlinearity fForgetGate;
@@ -142,26 +144,20 @@ public class LstmLayer implements Model {
 		Wch = Matrix.rand(outputDimension, outputDimension, initParamsStdDev, rng);
 		bc = Matrix.zeros(outputDimension);
 		
-		//List of hiddenContext for the recurrent component
-		hiddenContext = new ArrayList<Matrix>();
-		cellContext = new ArrayList<Matrix>();
-		
-		hiddenContext.add(Matrix.zeros(outputDimension, inputCols));
-		cellContext.add(Matrix.zeros(outputDimension, inputCols));
 		
 		lstmCells = new ArrayList<LstmCell>();
 		lstmCells.add(LstmCell.zeros(inputDimension, outputDimension, inputCols));
 		
-		hiddenContent = Matrix.zeros(outputDimension, inputCols);
-		cellContent = Matrix.zeros(outputDimension, inputCols);
+		hidden0 = Matrix.zeros(outputDimension, inputCols);
+		cell0 = Matrix.zeros(outputDimension, inputCols);
+		
+		hiddenContent = hidden0;
+		cellContent = cell0;
 		
 		nsteps = 0;
-	}
-
-	
-	public void initializeHiddenContext(int steps) {
 		
 	}
+
 	
 	
 	public LstmLayer() {
@@ -171,38 +167,37 @@ public class LstmLayer implements Model {
 	@Override
 	public Matrix forward(Matrix input, Graph g) throws Exception {
 		
-		nsteps = hiddenContext.size() - 1;
-		
+	
 		//input gate  
 		Matrix sum0 = g.mul(Wix, input);
-		Matrix sum1 = g.mul(Wih, hiddenContext.get(nsteps));
+		Matrix sum1 = g.mul(Wih, hiddenContent);
 		Matrix inputGate = g.nonlin(fInputGate, g.add(g.add(sum0, sum1), bi));
 		
 		//forget gate
 		Matrix sum2 = g.mul(Wfx, input);
-		Matrix sum3 = g.mul(Wfh, hiddenContext.get(nsteps));
+		Matrix sum3 = g.mul(Wfh, hiddenContent);
 		Matrix forgetGate = g.nonlin(fForgetGate, g.add(g.add(sum2, sum3), bf));
 		
 		//output gate
 		Matrix sum4 = g.mul(Wox, input);
-		Matrix sum5 = g.mul(Woh, hiddenContext.get(nsteps));
+		Matrix sum5 = g.mul(Woh, hiddenContent);
 		Matrix outputGate = g.nonlin(fOutputGate, g.add(g.add(sum4, sum5), bo));
 
 		//write operation on cells
 		Matrix sum6 = g.mul(Wcx, input);
-		Matrix sum7 = g.mul(Wch, hiddenContext.get(nsteps));
+		Matrix sum7 = g.mul(Wch, hiddenContent);
 		Matrix cellInput = g.nonlin(fCellInput, g.add(g.add(sum6, sum7), bc));
 		
 		//compute new cell activation
-		Matrix retainCell = g.elmul(forgetGate, cellContext.get(nsteps));
+		Matrix retainCell = g.elmul(forgetGate, cellContent);
 		Matrix writeCell = g.elmul(inputGate,  cellInput);
 		Matrix cellAct = g.add(retainCell,  writeCell);
 		
 		//compute hidden state as gated, saturated cell activations
 		Matrix output = g.elmul(outputGate, g.nonlin(fCellOutput, cellAct));
 	
-		hiddenContext.add(output);
-		cellContext.add(cellAct);
+		hiddenContent = output;
+		cellContent = cellAct;
 		
 		return output;
 	}
@@ -214,8 +209,11 @@ public class LstmLayer implements Model {
 	public void static_forward(Matrix input, Graph g) throws Exception 
 	{
 		
-		if(nsteps == lstmCells.size()) 
-		{lstmCells.add(LstmCell.zeros(inputDimension, outputDimension, inputCols));}
+//		System.out.println("Nstep = " + nsteps + ", size = " + lstmCells.size());
+		
+		if(nsteps == lstmCells.size()) {
+			lstmCells.add(LstmCell.zeros(inputDimension, outputDimension, inputCols));
+		}
 					
 		g.mul(Wix, input, lstmCells.get(nsteps).outmul0);
 		g.mul(Wih, hiddenContent, lstmCells.get(nsteps).outmul1);
@@ -252,18 +250,13 @@ public class LstmLayer implements Model {
 		hiddenContent = lstmCells.get(nsteps).output;
 		cellContent = lstmCells.get(nsteps).cellAct;
 
-//		
-//		hiddenContext.add(Matrix.copyMatrix(lstmCells.get(nsteps).output));
-//		cellContext.add(Matrix.copyMatrix(lstmCells.get(nsteps).cellAct));
-
 		nsteps++;
 	}
 		
 
 	
 	@Override
-    public void forward_ff(Matrix input, Graph g) throws Exception {
-		
+    public void forward_ff(Matrix input, Graph g) throws Exception {	
 	}
 
 	
@@ -271,33 +264,48 @@ public class LstmLayer implements Model {
     @Override
     public Matrix getOutput()
     {
-    	return lstmCells.get(lstmCells.size() - 1).output;
+    	return lstmCells.get(nsteps-1).output;
     }
     
 
 	public void prepareCuda()
 	{
 		
-		nvrtcProgram program = new nvrtcProgram();
-        nvrtcCreateProgram(program, updateSourceCode, null, 0, null, null);
-        nvrtcCompileProgram(program, 0, null);
-                
-        // Print the compilation log (for the case there are any warnings)
-        String[] programLog = new String[1];
-        nvrtcGetProgramLog(program, programLog);
-        System.out.println("LSTM Program compilation\n" + programLog[0]); 
-    	    	
-        // Obtain the PTX ("CUDA Assembler") code of the compiled program
-        String[] ptx = new String[1];
-        nvrtcGetPTX(program, ptx);
-        nvrtcDestroyProgram(program);
-
-        // Create a CUDA module from the PTX code
+		
+        String ptxFileName = null;
+        try
+        {
+            ptxFileName = Loss.preparePtxFile("cuda/update_parameters.cu");
+        }
+        catch (IOException e)
+        {
+            throw new RuntimeException("Could not prepare PTX file", e);
+        }
         module = new CUmodule();
-        cuModuleLoadData(module, ptx[0]);
-
-        // Obtain the function pointer to the "add" function from the module
-        function = new CUfunction();				
+        cuModuleLoad(module, ptxFileName);
+        function = new CUfunction();   
+		
+//		
+//		nvrtcProgram program = new nvrtcProgram();
+//        nvrtcCreateProgram(program, updateSourceCode, null, 0, null, null);
+//        nvrtcCompileProgram(program, 0, null);
+//                
+//        // Print the compilation log (for the case there are any warnings)
+//        String[] programLog = new String[1];
+//        nvrtcGetProgramLog(program, programLog);
+//        System.out.println("LSTM Program compilation\n" + programLog[0]); 
+//    	    	
+//        // Obtain the PTX ("CUDA Assembler") code of the compiled program
+//        String[] ptx = new String[1];
+//        nvrtcGetPTX(program, ptx);
+//        nvrtcDestroyProgram(program);
+//
+//        // Create a CUDA module from the PTX code
+//        module = new CUmodule();
+//        cuModuleLoadData(module, ptx[0]);
+//
+//        // Obtain the function pointer to the "add" function from the module
+//        function = new CUfunction();				
 		
 	}
 	
@@ -328,24 +336,17 @@ public class LstmLayer implements Model {
 	
 	@Override
 	public void resetState() {
+				
+		resetToZero(hidden0);
+		resetToZero(cell0);
 		
-		
-		resetToZero(hiddenContent);
-		resetToZero(cellContent);
-		
-		for(int i = 0; i < hiddenContext.size(); i++)
-		{	
-		  hiddenContext.get(i).destroyMatrix(); 
-		  cellContext.get(i).destroyMatrix(); 	
+		hiddenContent = hidden0;
+		cellContent = cell0;
+				
+		for(int i = 0; i < lstmCells.size(); i++) {
+			lstmCells.get(i).resentCell(function, module);
 		}
-		
-		hiddenContext.clear();
-		cellContext.clear();
-		
-		hiddenContext.add(Matrix.zeros(outputDimension, inputCols));
-		cellContext.add(Matrix.zeros(outputDimension, inputCols));
-		
-		nsteps = 0;
+		nsteps = 0;		
 		
 	}
 	
@@ -361,18 +362,18 @@ public class LstmLayer implements Model {
 	@Override
 	public List<Matrix> getParameters() {
 		List<Matrix> result = new ArrayList<>();
-		result.add(Wix); //0
-		result.add(Wih); //1  !!
-		result.add(bi);  //2
-		result.add(Wfx); //3
-		result.add(Wfh); //4  !!
-		result.add(bf);  //5  !!
-		result.add(Wox); //6
-		result.add(Woh); //7  !!
-		result.add(bo);  //8
-		result.add(Wcx); //9
-		result.add(Wch); //10 !!
-		result.add(bc);  //11
+		result.add(Wix); 
+		result.add(Wih); 
+		result.add(bi);  
+		result.add(Wfx); 
+		result.add(Wfh); 
+		result.add(bf);  
+		result.add(Wox); 
+		result.add(Woh); 
+		result.add(bo); 
+		result.add(Wcx);
+		result.add(Wch); 
+		result.add(bc);  
 		return result;
 	}
 	
@@ -392,12 +393,12 @@ public class LstmLayer implements Model {
 		Wch.destroyMatrix();
 		bc.destroyMatrix();
 		
-		for(int i = 0; i < hiddenContext.size(); i++)
-		{	
-		  hiddenContext.get(i).destroyMatrix(); 
-		  cellContext.get(i).destroyMatrix(); 	
-		}
+		hidden0.destroyMatrix();
+		cell0.destroyMatrix();
 		
+		hiddenContent.destroyMatrix();
+		cellContent.destroyMatrix();
+				
 		for(int i = 0; i < lstmCells.size(); i++)
 		{	
 		  lstmCells.get(i).destroycell();
@@ -453,14 +454,11 @@ public class LstmLayer implements Model {
         Random r = new Random();		        
 		DataSet data = new EmbeddedReberGrammar(r);
 		
-//		int count = 0;
-//        for (DataSequence seq : data.testing) {
-//			
-//			System.out.println("Sequence... " + count); 
+
+//		for (DataSequence seq : data.training) {
 //			System.out.println(seq.toString());
-//			count++;
-//        }
-		
+//		}
+			
 		
 		
 		int inputDimension = data.inputDimension;
@@ -508,6 +506,8 @@ public class LstmLayer implements Model {
 			
 		  for (DataSequence seq : data.training) {
 			
+		  
+			  
 			LSTMNet.resetState();
 			g.emptyBackpropQueue();
 			
@@ -524,8 +524,8 @@ public class LstmLayer implements Model {
 						
 						throw new RuntimeException("Could not converge");	
 					}
-			
 					
+
 					numerLoss += loss;
 					denomLoss++;			
 					if (applyTraining) {
@@ -534,19 +534,21 @@ public class LstmLayer implements Model {
 				}
 				
 			}
-			System.out.println("Loss at " + count + " = " + numerLoss/denomLoss);
+			//System.out.println("Loss at " + count + " = " + numerLoss/denomLoss);			
 			count++;
 
+			if(numerLoss/denomLoss == 0) {break;}
+			
 			if (applyTraining) {
 				
 				g.backward(); 
 				updateModelParams(module, function, LSTMNet, stepSize, decayRate, regularization, smoothEpsilon, gradientClipValue);
 			}
-			
 		  }
-		  if(i%10 == 0) {
-			  System.out.println("Epoch " + i + " average loss = " + numerLoss/denomLoss);
-		  }
+		  
+		  
+		  System.out.println("Epoch " + i + " average loss = " + numerLoss/denomLoss);
+		  
 		}
 		
 		
@@ -576,7 +578,43 @@ public class LstmLayer implements Model {
 		  }
 		  System.out.println("Test set average loss = " + numerLoss/denomLoss);
 		
+		  
+			for (DataSequence seq : data.validation) {
+				
+				LSTMNet.resetState();
+				g.emptyBackpropQueue();
+				
+				for (DataStep step : seq.steps) {
+					
+					LSTMNet.forward_ff(step.input, g);
+					
+					if (step.targetOutput != null) {
+						
+						double loss = lossReporting.measure(LSTMNet.getOutput(), step.targetOutput);					
+						if (Double.isNaN(loss) || Double.isInfinite(loss)) {
+							
+							throw new RuntimeException("Could not converge");
+							
+						}
+						
+						numerLoss += loss;
+						denomLoss++;			
+					}
+				}	
+			  }
+			  System.out.println("Validation set average loss = " + numerLoss/denomLoss);		  
+		  
+		  
+		  
 		
+	         List<Matrix> params = LSTMNet.getParameters();
+	         
+	         for(int i = 0; i < params.size(); i++)
+	         {
+	         	System.out.println("Parameters " + i);
+	         	params.get(i).printMatrix();
+	         }
+		  
 	
 		  for(int i = 0; i < data.training.size(); i++)    data.training.get(i).destroyDataSequence();		
 		  for(int i = 0; i < data.validation.size(); i++)  data.validation.get(i).destroyDataSequence();
@@ -651,9 +689,6 @@ public class LstmLayer implements Model {
 		catch (Exception e) {
 				e.printStackTrace();
 		}   
-        
-		
-		
 	}
 
 
@@ -718,11 +753,55 @@ public class LstmLayer implements Model {
 			return cell;
 		}
 		
-		public void resetCell()
+		
+		public void resentCell(CUfunction function, CUmodule module)
 		{
 			
+			resetCell(function, module, outmul0, outmul1, outmul2, outmul3, outmul4);
+			resetCell(function, module, outadd0, outadd1, outadd2, outadd3, outadd4);
+			resetCell(function, module, outmul5, outmul6, outmul7, outadd5, outadd6);
+			resetCell(function, module, outadd7, outinputGate, outforgetGate, outputGate, cellInput);
+			resetCell(function, module, outnonlin, retainCell, writeCell, cellAct, output);
 		}
 		
+
+		public void resetCell(CUfunction function, CUmodule module, Matrix out0, 
+																	Matrix out1, 
+																	Matrix out2, 
+																	Matrix out3, 
+																	Matrix out4) {
+			
+			cuModuleGetFunction(function, module, "reset_zero_lstm");
+	        Pointer kernelParameters = Pointer.to(
+	            Pointer.to(new int[]{outmul0.size}),
+	            Pointer.to(out0.w),
+	            Pointer.to(out0.dw),
+	            Pointer.to(out0.stepCache),
+	            Pointer.to(out1.w),
+	            Pointer.to(out1.dw),
+	            Pointer.to(out1.stepCache),
+	            Pointer.to(out2.w),
+	            Pointer.to(out2.dw),
+	            Pointer.to(out2.stepCache),
+	            Pointer.to(out3.w),
+	            Pointer.to(out3.dw),
+	            Pointer.to(out3.stepCache),
+	            Pointer.to(out4.w),
+	            Pointer.to(out4.dw),
+	            Pointer.to(out4.stepCache)	            
+	        );
+	                
+	        int blockSizeX = 256;
+	        int gridSizeX = (outmul0.size + blockSizeX - 1) / blockSizeX;
+	        cuLaunchKernel(function,
+	          gridSizeX,  1, 1,      // Grid dimension
+	          blockSizeX, 1, 1,      // Block dimension
+	          0, null,               // Shared memory size and stream
+	          kernelParameters, null // Kernel-
+	        );
+	        
+	        cuCtxSynchronize();	
+		}
 		
 		public void destroycell()
 		{

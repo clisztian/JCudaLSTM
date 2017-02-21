@@ -263,21 +263,21 @@ public class Matrix implements Serializable {
     public void rand(double initParamsStdDev, curandGenerator generator) 
     {
     	
-    	double hostData[] = new double[this.size];
-	    Arrays.fill(hostData,  .2*initParamsStdDev);
-	    
-	    cudaMemcpy(w, Pointer.to(hostData), size * Sizeof.DOUBLE,
-	        cudaMemcpyHostToDevice);
+//    	double hostData[] = new double[this.size];
+//	    Arrays.fill(hostData,  .2*initParamsStdDev);
+//	    
+//	    cudaMemcpy(w, Pointer.to(hostData), size * Sizeof.DOUBLE,
+//	        cudaMemcpyHostToDevice);
     	
     	
-//        // Create pseudo-random number generator 
-//        curandCreateGenerator(generator, CURAND_RNG_PSEUDO_DEFAULT);
-//
-//        // Set seed 
-//        curandSetPseudoRandomGeneratorSeed(generator, 1);
-//
-//        // Generate n floats on device 
-//    	curandGenerateNormalDouble(generator, w, this.size, mean, initParamsStdDev);
+        // Create pseudo-random number generator 
+        curandCreateGenerator(generator, CURAND_RNG_PSEUDO_DEFAULT);
+
+        // Set seed 
+        curandSetPseudoRandomGeneratorSeed(generator, 1);
+
+        // Generate n floats on device 
+    	curandGenerateNormalDouble(generator, w, this.size, 0, initParamsStdDev);
 		
 	}
     

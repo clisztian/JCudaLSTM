@@ -41,7 +41,6 @@ import jcuda.driver.CUdevice;
 import jcuda.driver.CUfunction;
 import jcuda.driver.CUmodule;
 import jcuda.driver.JCudaDriver;
-import jcuda.jcublas.JCublas;
 import jcuda.jcublas.cublasHandle;
 import jcuda.jcurand.curandGenerator;
 import jcuda.nvrtc.JNvrtc;
@@ -427,18 +426,16 @@ public class Graph {
 				public void run() {
 				
 					
-					Graph.printPointer(m2.size, m2.dw);
-					
 					matrixmultdw2(m2.rows, m2.cols, out.rows, m2.w, out.dw, m1.dw);
 					matrixmultdw1(m1.cols, m1.rows, out.cols, m1.w, out.dw, m2.dw);	
 					
-					Graph.printPointer(m1.size, m1.w);
-					Graph.printPointer(m2.size, m2.w);
-					Graph.printPointer(out.size, out.dw);
-					Graph.printPointer(m1.size, m1.dw);
-					Graph.printPointer(m2.size, m2.dw);
-					
-					System.out.println("");
+//					Graph.printPointer(m1.size, m1.w);
+//					Graph.printPointer(m2.size, m2.w);
+//					Graph.printPointer(out.size, out.dw);
+//					Graph.printPointer(m1.size, m1.dw);
+//					Graph.printPointer(m2.size, m2.dw);
+//					
+//					System.out.println("");
 
 					
 				}
@@ -467,31 +464,19 @@ public class Graph {
 		
 		Pointer zero = Pointer.to(new double[]{ 0.0 });
         Pointer one = Pointer.to(new double[]{ 1.0 });
-		Pointer temp = new Pointer();
-		
-		cudaMalloc(temp, hA*wB*Sizeof.DOUBLE);
-		JCublas.cublasDcopy(hA*wB, out, 1, temp, 1);		
 
-	    cublasDgemm(handle, CUBLAS_OP_T, CUBLAS_OP_N, hA, wB, wA, one, dA, wA, dB, wA, one, temp, hA);
-	    cublasDgeam(handle, CUBLAS_OP_T, CUBLAS_OP_T, wB, hA, one, temp, hA, zero, temp, hA, out, wB);   
-	    //cublasDgeam(handle, CUBLAS_OP_T, CUBLAS_OP_T, wB, hA, one, temp, hA, one, out, hA, out, wB);   
-	    
-	    cudaFree(temp);	    
+	    cublasDgemm(handle, CUBLAS_OP_T, CUBLAS_OP_N, hA, wB, wA, one, dA, wA, dB, wA, one, out, hA);
+	    cublasDgeam(handle, CUBLAS_OP_T, CUBLAS_OP_T, wB, hA, one, out, hA, zero, out, hA, out, wB);     
 	}
 
+	
+	
+	
 	public void matrixmultdw1(int hA, int wA, int wB, Pointer dA, Pointer dB, Pointer out)
 	{
 		Pointer one = Pointer.to(new double[]{ 1.0 }); 
-        //Pointer temp = new Pointer();
-        
-        //cudaMalloc(temp, hA*wB*Sizeof.DOUBLE);
-        
-//        cublasDgemm(handle, CUBLAS_OP_N, CUBLAS_OP_T, hA, wB, wA, one, dA, hA, dB, wB, zero, temp, hA);
-//        cublasDgeam(handle, CUBLAS_OP_T, CUBLAS_OP_T, wB, hA, one, temp, hA, zero, temp, hA, out, wB);	
-        
         cublasDgemm(handle, CUBLAS_OP_N, CUBLAS_OP_T, hA, wB, wA, one, dA, hA, dB, wB, one, out, hA);
-        
-        //cudaFree(temp);
+
 	}	
 	
 	public void matrixmultip(int hA, int wA, int wB, Pointer dA, Pointer dB, Pointer out)

@@ -52,10 +52,6 @@ public class FeedForwardLayer implements Model {
 	Matrix b;
 	Nonlinearity f;
 	
-//	Matrix outmul; 
-//	Matrix outsum;
-//	Matrix outnonlin;
-	
 	List<FFCell> ffCell;
 	
 	
@@ -109,9 +105,6 @@ public class FeedForwardLayer implements Model {
 	}
 	
 
-	
-	
-	
 	public void prepare()
     {
         String ptxFileName = null;
@@ -139,8 +132,9 @@ public class FeedForwardLayer implements Model {
 	@Override
 	public void static_forward(Matrix input, Graph g) throws Exception {
 		
-		if(nstep == ffCell.size())
-		{ffCell.add(FFCell.zeros(inputDimension, outputDimension, b.cols));}
+		if(nstep == ffCell.size()) {
+			ffCell.add(FFCell.zeros(inputDimension, outputDimension, b.cols));
+		}
 		
 		g.mul(W, input, ffCell.get(nstep).outmul);
 		g.add(ffCell.get(nstep).outmul, b, ffCell.get(nstep).outsum);
@@ -637,7 +631,7 @@ public class FeedForwardLayer implements Model {
 
 	@Override
 	public Matrix getOutput() {
-		return ffCell.get(ffCell.size() - 1).outnonlin;
+		return ffCell.get(nstep - 1).outnonlin;
 	}
 	
 	
@@ -709,9 +703,6 @@ public class FeedForwardLayer implements Model {
 			outnonlin.destroyMatrix();			
 		}
 		
-		
-		
-
 	}
 	
 	

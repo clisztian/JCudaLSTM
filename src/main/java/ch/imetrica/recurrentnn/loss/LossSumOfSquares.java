@@ -59,10 +59,7 @@ public class LossSumOfSquares implements Loss {
 
 	@Override
 	public void backward(Matrix actualOutput, Matrix targetOutput) throws Exception {
-		backwardError(actualOutput.size, actualOutput.w, targetOutput.w, actualOutput.dw);
-		
-		System.out.println("Backward error...");
-		Graph.printPointer(actualOutput.size, actualOutput.dw);
+		backwardError(actualOutput.size, actualOutput.w, targetOutput.w, actualOutput.dw);		
 	}
 	
 	@Override

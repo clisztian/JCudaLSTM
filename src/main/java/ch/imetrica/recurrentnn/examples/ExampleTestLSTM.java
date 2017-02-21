@@ -33,8 +33,8 @@ public class ExampleTestLSTM {
         curandCreateGenerator(r, CURAND_RNG_PSEUDO_DEFAULT);
         curandSetPseudoRandomGeneratorSeed(r, 1234);	
 		
-		int inputDimension = 6;
-		int outputDimension = 6;
+		int inputDimension = 600;
+		int outputDimension = 600;
 		
 		double[] samp = new double[inputDimension];
 		double[] target = new double[outputDimension];
@@ -55,7 +55,7 @@ public class ExampleTestLSTM {
         targets.add(targetOutput); targets.add(targetOutput1);
 		
 
-		int hiddenDimension = 7;
+		int hiddenDimension = 700;
 		int hiddenLayers = 1;
 		double learningRate = 0.001;
 		double initParamsStdDev = 0.08;
@@ -73,51 +73,44 @@ public class ExampleTestLSTM {
 				initParamsStdDev, r);
 		
 
-		//WWnn.resetState();
+		long beforeHostCall = System.nanoTime();
+		
+		nn.resetState();
 		
 		for(int i = 0; i < 2; i++)
 		{
 		 
 			nn.forward_ff(inputs.get(i), g);	
-			nn.getOutput().printMatrix();
+			//nn.getOutput().printMatrix();
 			
 			double loss = lossReporting.measure(nn.getOutput(), targets.get(i));
-			System.out.println("Loss = " + loss);
+			//System.out.println("Loss = " + loss);
 			
 			lossTraining.backward(nn.getOutput(), targets.get(i));
 		}
-		
-		
-		
-		
-		//nn.getOutput().printMatrix();
-		
-		//System.out.println("Loss = " + loss);
-		
-
-		//nn.getOutput().printMatrixDW();
+				
 		
         g.backward(); 
-        
-        //LstmLayer temp = (LstmLayer) nn.layers.get(0);
-        //temp.printOutputWih();
-        
-        
-
-        
- 
         
         Trainer train = new Trainer();
         train.updateModelParams(nn, learningRate);
 
+        nn.resetState();
+        
+        long afterHostCall = System.nanoTime();
+        
+        double hostDuration = (afterHostCall - beforeHostCall) / 1e6;
+	    System.out.println("Host call duration: " + hostDuration + " ms");
+        
+        
 
-        List<Matrix> params = nn.getParameters();
-
-        for(int i = 0; i < params.size(); i++)
-        {
-        	System.out.println("Parameters " + i);
-        	params.get(i).printMatrix();
-        }
+//        List<Matrix> params = nn.getParameters();
+//
+//        for(int i = 0; i < params.size(); i++)
+//        {
+//        	System.out.println("Parameters " + i);
+//        	params.get(i).printMatrix();
+//        }
         
         
         
@@ -125,13 +118,12 @@ public class ExampleTestLSTM {
 		System.out.println("done.");
 		
 		nn.deleteParameters();
-		input.destroyMatrix();
-		targetOutput.destroyMatrix();
-//		for(int i = 0; i < inputs.size(); i++)
-//		{
-//			inputs.get(i).destroyMatrix();
-//			targets.get(i).destroyMatrix();
-//		}
+
+		for(int i = 0; i < inputs.size(); i++)
+		{
+			inputs.get(i).destroyMatrix();
+			targets.get(i).destroyMatrix();
+		}
 		
 		
 		
