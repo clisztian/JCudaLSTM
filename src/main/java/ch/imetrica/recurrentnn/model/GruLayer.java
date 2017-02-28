@@ -7,7 +7,6 @@ import java.util.ArrayList;
 import java.util.List;
 import ch.imetrica.recurrentnn.autodiff.Graph;
 import ch.imetrica.recurrentnn.matrix.Matrix;
-import ch.imetrica.recurrentnn.model.LstmLayer.LstmCell;
 import jcuda.Pointer;
 import jcuda.driver.CUfunction;
 import jcuda.driver.CUmodule;
@@ -36,6 +35,7 @@ public class GruLayer implements Model {
 	
 	Matrix cellContent;
 	Matrix cell0; 
+	Matrix ones, negones;
 	
 	Nonlinearity fMix;
 	Nonlinearity fReset;
@@ -72,6 +72,9 @@ public class GruLayer implements Model {
 		cell0 = Matrix.zeros(outputDimension, inputCols);		
 		cellContent = cell0;
 		
+		ones = Matrix.ones(outputDimension, inputCols);
+		negones = Matrix.negones(outputDimension, inputCols);
+		
 		nsteps = 0;
 		
 	}
@@ -93,7 +96,7 @@ public class GruLayer implements Model {
 		Matrix actNewPlusGatedContext = g.nonlin(fNew, g.add(g.add(sum4, sum5), Bnew));
 		
 		Matrix memvals = g.elmul(actMix, cellContent);
-		Matrix newvals = g.elmul(g.oneMinus(actMix), actNewPlusGatedContext);
+		Matrix newvals = g.elmul(actMix, actNewPlusGatedContext);
 		Matrix output = g.add(memvals, newvals);
 		
 		cellContent = output;
@@ -109,7 +112,6 @@ public class GruLayer implements Model {
 			gruCells.add(GRUCell.zeros(inputDimension, outputDimension, inputCols));
 		}
 		
-		
 		g.mul(IHmix, input, gruCells.get(nsteps).outmul0);
 		g.mul(HHmix, cellContent, gruCells.get(nsteps).outmul1);
 		g.add(gruCells.get(nsteps).outmul0, gruCells.get(nsteps).outmul1, gruCells.get(nsteps).outadd0);
@@ -123,14 +125,15 @@ public class GruLayer implements Model {
 		g.nonlin(fReset, gruCells.get(nsteps).outadd3, gruCells.get(nsteps).actReset);
 		
 		g.mul(IHnew, input, gruCells.get(nsteps).outmul4);
-		g.elmul(gruCells.get(nsteps).actMix, cellContent, gruCells.get(nsteps).gatedContext);
+		g.elmul(gruCells.get(nsteps).actReset, cellContent, gruCells.get(nsteps).gatedContext);
 		g.mul(HHnew, gruCells.get(nsteps).gatedContext, gruCells.get(nsteps).outmul5);
 		g.add(gruCells.get(nsteps).outmul4,  gruCells.get(nsteps).outmul5,  gruCells.get(nsteps).outadd4);
 		g.add(gruCells.get(nsteps).outadd4, Bnew, gruCells.get(nsteps).outadd5);
 		g.nonlin(fNew, gruCells.get(nsteps).outadd5, gruCells.get(nsteps).actNewPlusGatedContext);
 		
 		g.elmul(gruCells.get(nsteps).actMix, cellContent,  gruCells.get(nsteps).memvals);
-		g.elmul(g.oneMinus(gruCells.get(nsteps).actMix), gruCells.get(nsteps).actNewPlusGatedContext);
+		g.oneMinus(ones, negones, gruCells.get(nsteps).negActMix, gruCells.get(nsteps).actMix, gruCells.get(nsteps).oneMinusActMix);
+		g.elmul(gruCells.get(nsteps).oneMinusActMix, gruCells.get(nsteps).actNewPlusGatedContext, gruCells.get(nsteps).newvals);
 		g.add(gruCells.get(nsteps).memvals, gruCells.get(nsteps).newvals,  gruCells.get(nsteps).output);
 		
 		cellContent = gruCells.get(nsteps).output;
@@ -231,13 +234,14 @@ public class GruLayer implements Model {
 		Matrix outmul4, outmul5, outadd4, outadd5;
 		Matrix outmul6, outmul7, outadd6, outadd7;
 
-		Matrix output; 
+		Matrix output, oneMinusActMix, negActMix; 
 
 		Matrix actMix, actReset, memvals, newvals;
 		Matrix gatedContext, actNewPlusGatedContext;
 		
 		public void createCell(int inputDimension, int outputDimension, int inputCols)
 		{
+			
 		    this.inputDimension = inputDimension;
 			this.outputDimension = outputDimension;
 			this.inputCols = inputCols;
@@ -255,15 +259,15 @@ public class GruLayer implements Model {
 			outmul5 = Matrix.zeros(outputDimension, inputCols);
 			outadd4 = Matrix.zeros(outmul4.rows, outmul5.cols);
 			outadd5 = Matrix.zeros(outadd4.rows, inputCols);
-		
-			
+
 			gatedContext = Matrix.zeros(outputDimension, inputCols);
 			actMix = Matrix.zeros(outputDimension, inputCols);
 			actReset = Matrix.zeros(outputDimension, inputCols);
 			actNewPlusGatedContext = Matrix.zeros(outputDimension, inputCols);
 			memvals = Matrix.zeros(outputDimension, inputCols); 
 			newvals = Matrix.zeros(outputDimension, inputCols); 
-			
+			oneMinusActMix = Matrix.zeros(outputDimension, inputCols); 
+			negActMix = Matrix.zeros(outputDimension, inputCols); 
 			output = Matrix.zeros(outputDimension, inputCols);
 			
 		}
@@ -281,8 +285,9 @@ public class GruLayer implements Model {
 			
 			resetCell(function, module, outmul0, outmul1, outmul2, outmul3, outmul4);
 			resetCell(function, module, outadd0, outadd1, outadd2, outadd3, outadd4);
-			resetCell(function, module, outmul5, outmul6, outmul7, outadd5, outadd6);
-
+			resetCell(function, module, outmul5, outadd5, gatedContext, actMix, actReset);
+			resetCell(function, module, actNewPlusGatedContext, memvals, newvals, oneMinusActMix, negActMix);
+			resetToZero(function, module, output);
 		}
 		
 
@@ -324,6 +329,29 @@ public class GruLayer implements Model {
 	        cuCtxSynchronize();	
 		}
 		
+		public void resetToZero(CUfunction function, CUmodule module,Matrix zero)
+		{
+			
+			cuModuleGetFunction(function, module, "reset_zero");
+	        Pointer kernelParameters = Pointer.to(
+	            Pointer.to(new int[]{zero.size}),
+	            Pointer.to(zero.w),
+	            Pointer.to(zero.dw),
+	            Pointer.to(zero.stepCache)
+	        );
+	                
+	        int blockSizeX = 256;
+	        int gridSizeX = (zero.size + blockSizeX - 1) / blockSizeX;
+	        cuLaunchKernel(function,
+	          gridSizeX,  1, 1,      // Grid dimension
+	          blockSizeX, 1, 1,      // Block dimension
+	          0, null,               // Shared memory size and stream
+	          kernelParameters, null // Kernel-
+	        );
+	        
+	        cuCtxSynchronize();	
+		}
+		
 		public void destroycell()
 		{
 			outmul0.destroyMatrix();
@@ -342,14 +370,9 @@ public class GruLayer implements Model {
 			outmul5.destroyMatrix();
 			outadd4.destroyMatrix();
 			outadd5.destroyMatrix();
-	
 
-			outmul6.destroyMatrix();
-			outmul7.destroyMatrix();
-			outadd6.destroyMatrix();
-			outadd7.destroyMatrix();
-	
-			
+			oneMinusActMix.destroyMatrix();	
+			negActMix.destroyMatrix();	
 			gatedContext.destroyMatrix();			
 			actMix.destroyMatrix();
 			actReset.destroyMatrix();

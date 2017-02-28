@@ -46,7 +46,7 @@ public class FeedForwardLayer implements Model {
 	
 	int outputDimension;
 	int inputDimension;
-	int nstep = 0;
+	int nsteps = 0;
 	
 	Matrix W;
 	Matrix b;
@@ -100,7 +100,7 @@ public class FeedForwardLayer implements Model {
 		ffCell.add(FFCell.zeros(inputDimension, outputDimension, b.cols));
 		
 		
-		nstep = 0;
+		nsteps = 0;
 		prepare();		
 	}
 	
@@ -132,15 +132,15 @@ public class FeedForwardLayer implements Model {
 	@Override
 	public void static_forward(Matrix input, Graph g) throws Exception {
 		
-		if(nstep == ffCell.size()) {
+		if(nsteps == ffCell.size()) {
 			ffCell.add(FFCell.zeros(inputDimension, outputDimension, b.cols));
 		}
 		
-		g.mul(W, input, ffCell.get(nstep).outmul);
-		g.add(ffCell.get(nstep).outmul, b, ffCell.get(nstep).outsum);
-		g.nonlin(f, ffCell.get(nstep).outsum, ffCell.get(nstep).outnonlin);	
+		g.mul(W, input, ffCell.get(nsteps).outmul);
+		g.add(ffCell.get(nsteps).outmul, b, ffCell.get(nsteps).outsum);
+		g.nonlin(f, ffCell.get(nsteps).outsum, ffCell.get(nsteps).outnonlin);	
 		
-		nstep++;
+		nsteps++;
 	}	
 	
 
@@ -175,7 +175,7 @@ public class FeedForwardLayer implements Model {
 	   {
 		ffCell.get(i).resetCell(function, module);
 	   }
-	   nstep = 0;
+	   nsteps = 0;
 	}
 
 	@Override
@@ -631,7 +631,7 @@ public class FeedForwardLayer implements Model {
 
 	@Override
 	public Matrix getOutput() {
-		return ffCell.get(nstep - 1).outnonlin;
+		return ffCell.get(nsteps - 1).outnonlin;
 	}
 	
 	

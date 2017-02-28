@@ -196,13 +196,10 @@ public class Graph {
 		}
 	}
 	
-	public Matrix oneMinus(final Matrix m) throws Exception {
+	public void oneMinus(final Matrix ones, final Matrix negones, final Matrix negM, final Matrix m, final Matrix out) throws Exception {
 		
-		
-		Matrix ones = Matrix.ones(m.rows, m.cols);
-		Matrix out = add(ones, neg(m));
-		return out;
-		
+		elmul(negones, m, negM);
+		add(ones, negM, out);
 	}
 	
 	public Matrix neg(final Matrix m) throws Exception {

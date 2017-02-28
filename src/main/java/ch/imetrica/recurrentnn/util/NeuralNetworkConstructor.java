@@ -34,7 +34,7 @@ public class NeuralNetworkConstructor {
 	
 	public static NeuralNetwork makeLstmWithInputBottleneck(int inputDimension, int bottleneckDimension, int hiddenDimension, int inputCols, int hiddenLayers, int outputDimension, Nonlinearity decoderUnit, double initParamsStdDev, curandGenerator rng) {
 		List<Model> layers = new ArrayList<>();
-		layers.add(new LinearLayer(inputDimension, bottleneckDimension, initParamsStdDev, rng));
+		layers.add(new LinearLayer(inputDimension, bottleneckDimension, inputCols, initParamsStdDev, rng));
 		for (int h = 0; h < hiddenLayers; h++) {
 			if (h == 0) {
 				layers.add(new LstmLayer(bottleneckDimension, hiddenDimension, inputCols, initParamsStdDev, rng, h+1));
@@ -67,14 +67,14 @@ public class NeuralNetworkConstructor {
 		}
 	}
 	
-	public static NeuralNetwork makeGru(int inputDimension, int hiddenDimension, int hiddenLayers, int outputDimension, Nonlinearity decoderUnit, double initParamsStdDev, curandGenerator rng) {
+	public static NeuralNetwork makeGru(int inputDimension, int hiddenDimension, int inputCols, int hiddenLayers, int outputDimension, Nonlinearity decoderUnit, double initParamsStdDev, curandGenerator rng) {
 		List<Model> layers = new ArrayList<>();
 		for (int h = 0; h < hiddenLayers; h++) {
 			if (h == 0) {
-				layers.add(new GruLayer(inputDimension, hiddenDimension, initParamsStdDev, rng));
+				layers.add(new GruLayer(inputDimension, hiddenDimension, inputCols, initParamsStdDev, rng));
 			}
 			else {
-				layers.add(new GruLayer(hiddenDimension, hiddenDimension, initParamsStdDev, rng));
+				layers.add(new GruLayer(hiddenDimension, hiddenDimension, inputCols, initParamsStdDev, rng));
 			}
 		}
 		layers.add(new FeedForwardLayer(hiddenDimension, outputDimension, decoderUnit, initParamsStdDev, rng, hiddenLayers + 1));

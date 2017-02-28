@@ -33,8 +33,8 @@ public class ExampleTestLSTM {
         curandCreateGenerator(r, CURAND_RNG_PSEUDO_DEFAULT);
         curandSetPseudoRandomGeneratorSeed(r, 1234);	
 		
-		int inputDimension = 600;
-		int outputDimension = 600;
+		int inputDimension = 6000;
+		int outputDimension = 6000;
 		
 		double[] samp = new double[inputDimension];
 		double[] target = new double[outputDimension];
@@ -55,7 +55,7 @@ public class ExampleTestLSTM {
         targets.add(targetOutput); targets.add(targetOutput1);
 		
 
-		int hiddenDimension = 700;
+		int hiddenDimension = 7000;
 		int hiddenLayers = 1;
 		double learningRate = 0.001;
 		double initParamsStdDev = 0.08;
