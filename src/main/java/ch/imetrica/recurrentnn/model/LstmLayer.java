@@ -209,8 +209,6 @@ public class LstmLayer implements Model {
 	public void static_forward(Matrix input, Graph g) throws Exception 
 	{
 		
-//		System.out.println("Nstep = " + nsteps + ", size = " + lstmCells.size());
-		
 		if(nsteps == lstmCells.size()) {
 			lstmCells.add(LstmCell.zeros(inputDimension, outputDimension, inputCols));
 		}
@@ -344,7 +342,7 @@ public class LstmLayer implements Model {
 		cellContent = cell0;
 				
 		for(int i = 0; i < lstmCells.size(); i++) {
-			lstmCells.get(i).resentCell(function, module);
+			lstmCells.get(i).resetCell(function, module);
 		}
 		nsteps = 0;		
 		
@@ -754,7 +752,7 @@ public class LstmLayer implements Model {
 		}
 		
 		
-		public void resentCell(CUfunction function, CUmodule module)
+		public void resetCell(CUfunction function, CUmodule module)
 		{
 			
 			resetCell(function, module, outmul0, outmul1, outmul2, outmul3, outmul4);
