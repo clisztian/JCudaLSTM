@@ -1,16 +1,43 @@
 package ch.imetrica.recurrentnn.model;
+import static jcuda.driver.JCudaDriver.cuCtxCreate;
 import static jcuda.driver.JCudaDriver.cuCtxSynchronize;
+import static jcuda.driver.JCudaDriver.cuDeviceGet;
+import static jcuda.driver.JCudaDriver.cuInit;
 import static jcuda.driver.JCudaDriver.cuLaunchKernel;
 import static jcuda.driver.JCudaDriver.cuModuleGetFunction;
+import static jcuda.driver.JCudaDriver.cuModuleLoad;
+import static jcuda.driver.JCudaDriver.cuModuleLoadData;
+import static jcuda.jcurand.JCurand.curandCreateGenerator;
+import static jcuda.jcurand.JCurand.curandSetPseudoRandomGeneratorSeed;
+import static jcuda.jcurand.curandRngType.CURAND_RNG_PSEUDO_DEFAULT;
+import static jcuda.nvrtc.JNvrtc.nvrtcCompileProgram;
+import static jcuda.nvrtc.JNvrtc.nvrtcCreateProgram;
+import static jcuda.nvrtc.JNvrtc.nvrtcDestroyProgram;
+import static jcuda.nvrtc.JNvrtc.nvrtcGetPTX;
+import static jcuda.nvrtc.JNvrtc.nvrtcGetProgramLog;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
+
 import ch.imetrica.recurrentnn.autodiff.Graph;
+import ch.imetrica.recurrentnn.datasets.EmbeddedReberGrammar;
+import ch.imetrica.recurrentnn.datastructs.DataSequence;
+import ch.imetrica.recurrentnn.datastructs.DataSet;
+import ch.imetrica.recurrentnn.datastructs.DataStep;
+import ch.imetrica.recurrentnn.loss.Loss;
 import ch.imetrica.recurrentnn.matrix.Matrix;
+import ch.imetrica.recurrentnn.util.NeuralNetworkConstructor;
 import jcuda.Pointer;
+import jcuda.driver.CUcontext;
+import jcuda.driver.CUdevice;
 import jcuda.driver.CUfunction;
 import jcuda.driver.CUmodule;
+import jcuda.driver.JCudaDriver;
 import jcuda.jcurand.curandGenerator;
+import jcuda.nvrtc.JNvrtc;
+import jcuda.nvrtc.nvrtcProgram;
 
 /*
  * As described in:
@@ -45,8 +72,51 @@ public class GruLayer implements Model {
 	List<GRUCell> gruCells;
 	
 	
-	public GruLayer(int inputDimension, int outputDimension, int inputCols, double initParamsStdDev, curandGenerator rng) {
+	private static String updateSourceCode = 
+			
+			"extern \"C\"" + "\n" +
+			"__global__ void updateParameters(int n, double stepsize, double decayRate, double reg, double smoothEpsilon," + "\n" + 
+			"                        double gradientClip, double *w, double *dw, double *cached)" + "\n" +
+			"{" + "\n" +
+			"    double mdwi;" + "\n" +	 
+			"	 int i = blockIdx.x * blockDim.x + threadIdx.x;" + "\n" +	 
+			"	 if (i<n)" + "\n" +
+			"	 {" + "\n" +
+			"		mdwi = dw[i];" + "\n" +
+			"		cached[i] = cached[i] * decayRate + (1.0 - decayRate)*mdwi*mdwi;" + "\n" +		
+			"       if(mdwi > gradientClip)" + "\n" + 
+			"       {" + "\n" +
+			"         mdwi = gradientClip;" + "\n" +
+			"		}" + "\n" +
+			"		if (mdwi < -gradientClip) " + "\n" +
+			"		{" + "\n" +
+			"		   mdwi = -gradientClip;" + "\n" +
+			"		}" + "\n" +			
+			"       w[i] = w[i] - stepsize*mdwi/sqrt(cached[i] + smoothEpsilon) - reg*w[i];" + "\n" +
+		    "		dw[i] = 0;" + "\n" +
+			"     }" + "\n" +
+			"}" + "\n\n" + 
+			"extern \"C\"" + "\n" +
+			"__global__ void reset_zero(int n, double *w, double *dw, double *cached)" + "\n" +
+			"{" + "\n" +
+			"	 int i = blockIdx.x * blockDim.x + threadIdx.x;" + "\n" +	 
+			"	 if (i<n)" + "\n" +
+			"	 {" + "\n" +
+			"	    w[i] = 0;" + "\n" +
+			"		dw[i] = 0;" + "\n" +
+			"		cached[i] = 0;" + "\n" +
+			"     }" + "\n" +
+			"}" + "\n";
+			
+	
+	
+	
+	public GruLayer(int inputDimension, int outputDimension, int inputCols, double initParamsStdDev, curandGenerator rng, int seed) {
 		
+		
+		curandSetPseudoRandomGeneratorSeed(rng, seed);
+		prepareCuda();
+
 		this.inputDimension = inputDimension;
 		this.outputDimension = outputDimension;
 		this.inputCols = inputCols;
@@ -79,6 +149,32 @@ public class GruLayer implements Model {
 		
 	}
 	
+	public GruLayer() {
+		// TODO Auto-generated constructor stub
+	}
+	
+	public void prepareCuda()
+	{
+		
+		
+        String ptxFileName = null;
+        try
+        {
+            ptxFileName = Loss.preparePtxFile("cuda/update_parameters.cu");
+        }
+        catch (IOException e)
+        {
+            throw new RuntimeException("Could not prepare PTX file", e);
+        }
+        module = new CUmodule();
+        cuModuleLoad(module, ptxFileName);
+        function = new CUfunction();   
+		
+				
+	}
+	
+	
+
 	@Override
 	public Matrix forward(Matrix input, Graph g) throws Exception {
 		
@@ -220,6 +316,263 @@ public class GruLayer implements Model {
 		cellContent.destroyMatrix();		
 	}
 
+	
+	
+	public void testGRU(int number_epochs, curandGenerator rng) throws Exception
+	{
+		
+		JCudaDriver.setExceptionsEnabled(true);
+        JNvrtc.setExceptionsEnabled(true);
+
+        // Initialize the driver and create a context for the first device.
+        cuInit(0);
+        CUdevice device = new CUdevice();
+        cuDeviceGet(device, 0);
+        CUcontext context = new CUcontext();
+        cuCtxCreate(context, 0, device);
+		
+		
+		double numerLoss = 0;
+		double denomLoss = 0;
+		
+		double stepSize = .001; 
+		double decayRate = 0.999;
+		double smoothEpsilon = 1e-8;
+		double gradientClipValue = 5;
+		double regularization = 0.000001; 
+		double intStdDev = 0.08;
+		
+		
+        Random r = new Random();		        
+		DataSet data = new EmbeddedReberGrammar(r);
+		
+		
+		int inputDimension = data.inputDimension;
+		int hiddenDimension = 12;
+		int hiddenLayers = 1; 
+		int outputDimension = data.outputDimension; 
+		boolean applyTraining = true;
+		
+		nvrtcProgram program = new nvrtcProgram();
+        nvrtcCreateProgram(program, updateSourceCode, null, 0, null, null);
+        nvrtcCompileProgram(program, 0, null);
+                
+        // Print the compilation log (for the case there are any warnings)
+        String[] programLog = new String[1];
+        nvrtcGetProgramLog(program, programLog);
+        //System.out.println("Nonlinear Backprob Program compilation log:\n" + programLog[0]); 
+    	    	
+        // Obtain the PTX ("CUDA Assembler") code of the compiled program
+        String[] ptx = new String[1];
+        nvrtcGetPTX(program, ptx);
+        nvrtcDestroyProgram(program);
+
+        // Create a CUDA module from the PTX code
+        module = new CUmodule();
+        cuModuleLoadData(module, ptx[0]);
+
+        // Obtain the function pointer to the "add" function from the module
+        function = new CUfunction();				
+		
+		Graph g = new Graph();
+		Loss lossReporting = data.lossReporting;
+		Loss lossTraining = data.lossTraining;
+		
+		NeuralNetwork GRUNet = NeuralNetworkConstructor.makeGru(inputDimension, hiddenDimension, 1, hiddenLayers, outputDimension,
+				data.getModelOutputUnitToUse(), intStdDev, rng);
+				
+		
+		for(int i = 0; i < number_epochs; i++)
+		{
+			
+		  numerLoss = 0;
+		  denomLoss = 0;		
+			
+		  for (DataSequence seq : data.training) {
+			
+		  
+			  
+			GRUNet.resetState();
+			g.emptyBackpropQueue();
+			
+			
+			for (DataStep step : seq.steps) {
+				
+				
+				GRUNet.forward_ff(step.input, g);
+				
+				if (step.targetOutput != null) {
+					
+					double loss = lossReporting.measure(GRUNet.getOutput(), step.targetOutput);					
+					if (Double.isNaN(loss) || Double.isInfinite(loss)) {
+						
+						throw new RuntimeException("Could not converge");	
+					}
+					
+
+					numerLoss += loss;
+					denomLoss++;			
+					if (applyTraining) {
+						lossTraining.backward(GRUNet.getOutput(), step.targetOutput);
+					}
+				}
+				
+			}
+			if(numerLoss/denomLoss == 0) {break;}
+			
+			if (applyTraining) {
+				
+				g.backward(); 
+				updateModelParams(module, function, GRUNet, stepSize, decayRate, regularization, smoothEpsilon, gradientClipValue);
+			}
+		  }
+		  
+		  
+		  System.out.println("Epoch " + i + " average loss = " + numerLoss/denomLoss);
+		  
+		}
+		
+		
+		
+		for (DataSequence seq : data.testing) {
+				
+			GRUNet.resetState();
+			g.emptyBackpropQueue();
+			
+			for (DataStep step : seq.steps) {
+				
+				GRUNet.forward_ff(step.input, g);
+				
+				if (step.targetOutput != null) {
+					
+					double loss = lossReporting.measure(GRUNet.getOutput(), step.targetOutput);					
+					if (Double.isNaN(loss) || Double.isInfinite(loss)) {
+						
+						throw new RuntimeException("Could not converge");
+						
+					}
+					
+					numerLoss += loss;
+					denomLoss++;			
+				}
+			}	
+		  }
+		  System.out.println("Test set average loss = " + numerLoss/denomLoss);
+		
+		  
+			for (DataSequence seq : data.validation) {
+				
+				GRUNet.resetState();
+				g.emptyBackpropQueue();
+				
+				for (DataStep step : seq.steps) {
+					
+					GRUNet.forward_ff(step.input, g);
+					
+					if (step.targetOutput != null) {
+						
+						double loss = lossReporting.measure(GRUNet.getOutput(), step.targetOutput);					
+						if (Double.isNaN(loss) || Double.isInfinite(loss)) {
+							
+							throw new RuntimeException("Could not converge");
+							
+						}
+						
+						numerLoss += loss;
+						denomLoss++;			
+					}
+				}	
+			  }
+			  System.out.println("Validation set average loss = " + numerLoss/denomLoss);		  
+		  
+		  
+		  
+		
+	         List<Matrix> params = GRUNet.getParameters();
+	         
+	         for(int i = 0; i < params.size(); i++)
+	         {
+	         	System.out.println("Parameters " + i);
+	         	params.get(i).printMatrix();
+	         }
+		  
+	
+		  for(int i = 0; i < data.training.size(); i++)    data.training.get(i).destroyDataSequence();		
+		  for(int i = 0; i < data.validation.size(); i++)  data.validation.get(i).destroyDataSequence();
+		  for(int i = 0; i < data.testing.size(); i++)     data.testing.get(i).destroyDataSequence();
+		  
+		  GRUNet.deleteParameters();
+		
+		
+	}
+	
+	
+	
+	private void updateModelParams(CUmodule module, CUfunction function, int n, double stepSize, double decayRate, double regularization, 
+			 double smoothEpsilon, double gradientClipValue, Pointer w, Pointer dw, Pointer cached)
+	{
+
+		
+		    cuModuleGetFunction(function, module, "updateParameters");
+	        Pointer kernelParameters = Pointer.to(
+	            Pointer.to(new int[]{n}),
+	            Pointer.to(new double[]{stepSize}),
+	            Pointer.to(new double[]{decayRate}),
+	            Pointer.to(new double[]{regularization}),
+	            Pointer.to(new double[]{smoothEpsilon}),
+	            Pointer.to(new double[]{gradientClipValue}),
+	            Pointer.to(w),
+	            Pointer.to(dw),
+	            Pointer.to(cached)
+	        );
+	                
+	        int blockSizeX = 256;
+          int gridSizeX = (n + blockSizeX - 1) / blockSizeX;
+	        cuLaunchKernel(function,
+	          gridSizeX,  1, 1,      // Grid dimension
+           blockSizeX, 1, 1,      // Block dimension
+           0, null,               // Shared memory size and stream
+           kernelParameters, null // Kernel-
+	        );
+	        
+         cuCtxSynchronize();
+	 }	
+	
+	
+	public void updateModelParams(CUmodule module, CUfunction function, NeuralNetwork nn, double stepSize, double decayRate, double regularization, 
+			 double smoothEpsilon, double gradientClipValue) throws Exception {
+		
+		for (Model layer : nn.layers) {			
+			for (Matrix m : layer.getParameters()) {
+								
+				updateModelParams(module, function, m.size, stepSize, decayRate, regularization, smoothEpsilon, 
+						gradientClipValue, m.w, m.dw, m.stepCache);		
+				
+			}
+		}
+	}	
+	
+	
+	public static void main(String[] args)
+    {
+		curandGenerator rng = new curandGenerator();
+        curandCreateGenerator(rng, CURAND_RNG_PSEUDO_DEFAULT);
+        curandSetPseudoRandomGeneratorSeed(rng, 1234);
+		
+        
+        GruLayer gru = new GruLayer();
+        
+        try {
+        	
+		    gru.testGRU(10, rng);
+			   
+		}
+		catch (Exception e) {
+				e.printStackTrace();
+		}   
+	}
+	
+	
 	
 	
 	static class GRUCell {

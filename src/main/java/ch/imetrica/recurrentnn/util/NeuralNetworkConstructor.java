@@ -71,10 +71,10 @@ public class NeuralNetworkConstructor {
 		List<Model> layers = new ArrayList<>();
 		for (int h = 0; h < hiddenLayers; h++) {
 			if (h == 0) {
-				layers.add(new GruLayer(inputDimension, hiddenDimension, inputCols, initParamsStdDev, rng));
+				layers.add(new GruLayer(inputDimension, hiddenDimension, inputCols, initParamsStdDev, rng, h+1));
 			}
 			else {
-				layers.add(new GruLayer(hiddenDimension, hiddenDimension, inputCols, initParamsStdDev, rng));
+				layers.add(new GruLayer(hiddenDimension, hiddenDimension, inputCols, initParamsStdDev, rng, h+1));
 			}
 		}
 		layers.add(new FeedForwardLayer(hiddenDimension, outputDimension, decoderUnit, initParamsStdDev, rng, hiddenLayers + 1));

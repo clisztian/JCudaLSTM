@@ -218,13 +218,9 @@ public class Graph {
 		
 		if (this.applyBackprop) {
 			Runnable bp = new Runnable() {
-				public void run() {
-					
-					Pointer tempOut = new Pointer();
-					cudaMalloc(tempOut, m.size * Sizeof.DOUBLE);					
-					neuron.backward(m.size, m.w, tempOut);					
-					nonlinearBackprop(m.size, m.dw, tempOut, out.dw); 
-					cudaFree(tempOut);
+				public void run() {									
+					neuron.backward(m.size, m.w, out.stepCache);					
+					nonlinearBackprop(m.size, m.dw, out.stepCache, out.dw); 
 				}
 			};
 			backprop.add(bp);
