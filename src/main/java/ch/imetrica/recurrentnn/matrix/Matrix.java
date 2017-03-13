@@ -366,6 +366,20 @@ public class Matrix implements Serializable {
 		return result;
     }
     
+    public static Matrix small(int rows, int cols) 
+    {
+    	
+    	Matrix result = new Matrix(rows, cols);		
+		
+    	double hostData[] = new double[result.size];
+	    Arrays.fill(hostData, -Double.MAX_VALUE);
+	    
+	    cudaMemcpy(result.w, Pointer.to(hostData), result.size * Sizeof.DOUBLE,
+	        cudaMemcpyHostToDevice);  
+
+		return result;
+    }
+    
     public static Matrix zeros(int rows) 
     {
     	Matrix result = new Matrix(rows, 1);		

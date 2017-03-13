@@ -116,7 +116,7 @@ public class Graph {
 	        "    {" + "\n" +
 	        "        out[i] = a[i]*b[i];" + "\n" +
 	        "    }" + "\n" +
-	        "}" + "\n\n" + 
+	        "}" + "\n\n" + 	        
 	        "extern \"C\"" + "\n" +
 	        "__global__ void crossmult(int n, double *m1dw, double *m2dw, double *m1w, double *m2w, double *outdw)" + "\n" +
 	        "{" + "\n" +
@@ -125,6 +125,23 @@ public class Graph {
 	        "    {" + "\n" +
 	        "        m1dw[i] = m1dw[i] + m2w[i] * outdw[i];" + "\n" +
 	        "        m2dw[i] = m2dw[i] + m1w[i] * outdw[i];" + "\n" +
+	        "    }" + "\n" +
+	        "}" + "\n\n" +
+	        "__global__ void elediv(int n, double *a, double *b, double *out)" + "\n" +
+	        "{" + "\n" +
+	        "    int i = blockIdx.x * blockDim.x + threadIdx.x;" + "\n" +
+	        "    if (i<n)" + "\n" +
+	        "    {" + "\n" +
+	        "        out[i] = a[i]/b[i];" + "\n" +
+	        "    }" + "\n" +
+	        "}" + "\n\n" + 
+	        "__global__ void crossdiv(int n, double *m1dw, double *m2dw, double *m1w, double *m2w, double *outdw)" + "\n" +
+	        "{" + "\n" +
+	        "    int i = blockIdx.x * blockDim.x + threadIdx.x;" + "\n" +
+	        "    if (i<n)" + "\n" +
+	        "    {" + "\n" +
+	        "        m1dw[i] = m1dw[i] + outdw[i]/m2w[i];" + "\n" +
+	        "        m2dw[i] = m2dw[i] - m1w[i] * outdw[i]/(m2w[i] * m2w[i]);" + "\n" +
 	        "    }" + "\n" +
 	        "}" + "\n\n" +
 	        "extern \"C\"" + "\n" +
@@ -230,6 +247,13 @@ public class Graph {
 		add(ones, negM, out);
 	}
 	
+    public void sub(final Matrix negones, final Matrix negM, final Matrix m1, final Matrix m2, final Matrix out) throws Exception {
+		
+		elmul(negones, m2, negM);
+		add(m1, negM, out);
+	}
+	
+	
 	public Matrix neg(final Matrix m) throws Exception {
 		Matrix negones = Matrix.negones(m.rows, m.cols);
 		Matrix out = elmul(negones, m);
@@ -256,11 +280,6 @@ public class Graph {
 		return out;
 	}
 	
-	/*
-	 * Matrix out m.rows, m.cols
-	 * 
-	 * 
-	 */
 	public void nonlin(final Nonlinearity neuron, final Matrix m, final Matrix out) throws Exception {
 		
 		neuron.forward(m.size, m.w, out.w);
@@ -268,22 +287,9 @@ public class Graph {
 		if (this.applyBackprop) {
 			Runnable bp = new Runnable() {
 				public void run() {
-					
-		
-//					System.out.println("\n\nPrint m.w backprop..");
-//					m.printMatrix();
-					
+
 					neuron.backward(m.size, m.w, out.stepCache);	
-					
-//					System.out.println("After print out matrix..");
-//                    out.printMatrix();
-                    
 					nonlinearBackprop(m.size, m.dw, out.stepCache, out.dw); 
-//					System.out.println("After print M matrix..");
-//                    m.printMatrix();
-					
-					
-		
 				}
 			};
 			backprop.add(bp);
@@ -313,25 +319,7 @@ public class Graph {
 	}
 	
 	
-	public void maximum(final Matrix m1, double val, final Matrix out) throws Exception {
 
-		if (m1.rows != out.rows || m1.cols != out.cols) {
-			throw new Exception("matrix dimension mismatch");
-		}
-	
-		
-		
-		
-		if (this.applyBackprop) {
-			Runnable bp = new Runnable() {
-				public void run() {
-										
-				}
-			};
-			backprop.add(bp);
-		}
-	}
-	
 	
 	
 	
@@ -420,7 +408,22 @@ public class Graph {
 		}
 	}	
 
-	
+	public void eldiv(final Matrix m1, final Matrix m2, final Matrix out) throws Exception {
+		if (m1.rows != m2.rows || m1.cols != m2.cols) {
+			throw new Exception("matrix dimension mismatch");
+		}
+			
+		elediv(out.size, m1.w, m2.w, out.w);
+
+		if (this.applyBackprop) {
+			Runnable bp = new Runnable() {
+				public void run() {
+					crossdiv(out.size, m1.dw, m2.dw, m1.w, m2.w, out.dw);
+				}
+			};
+			backprop.add(bp);
+		}
+	}		
 	
 	public Matrix mul(final Matrix m1, final Matrix m2) throws Exception {		
 		if (m1.cols != m2.rows) {
@@ -469,19 +472,8 @@ public class Graph {
 			Runnable bp = new Runnable() {
 				public void run() {
 				
-					
 					matrixmultdw2(m2.rows, m2.cols, out.rows, m2.w, out.dw, m1.dw);
-					matrixmultdw1(m1.cols, m1.rows, out.cols, m1.w, out.dw, m2.dw);	
-					
-//					Graph.printPointer(m1.size, m1.w);
-//					Graph.printPointer(m2.size, m2.w);
-//					Graph.printPointer(out.size, out.dw);
-//					Graph.printPointer(m1.size, m1.dw);
-//					Graph.printPointer(m2.size, m2.dw);
-//					
-//					System.out.println("");
-
-					
+					matrixmultdw1(m1.cols, m1.rows, out.cols, m1.w, out.dw, m2.dw);						
 				}
 			};
 			backprop.add(bp);
@@ -582,6 +574,29 @@ public class Graph {
 	    cuCtxSynchronize();		
 	}
 	
+	
+	public void elediv(int n, Pointer a, Pointer b, Pointer out) 
+	{
+		cuModuleGetFunction(function, module, "elediv");
+		Pointer kernelParameters = Pointer.to(
+                Pointer.to(new int[]{n}),
+                Pointer.to(a),
+                Pointer.to(b),
+                Pointer.to(out)
+        );
+		
+		int gridSizeX = (n + blockSizeX - 1) / blockSizeX;
+		cuLaunchKernel(function,
+	            gridSizeX,  1, 1,      // Grid dimension
+	            blockSizeX, 1, 1,      // Block dimension
+	            0, null,               // Shared memory size and stream
+	            kernelParameters, null // Kernel- and extra parameters
+	        );
+	    cuCtxSynchronize();		
+	}
+	
+	
+	
 	public void eleadd(int n, Pointer a, Pointer b, Pointer out) 
 	{
 		cuModuleGetFunction(function, module, "add");
@@ -625,6 +640,32 @@ public class Graph {
 	        );
 	    cuCtxSynchronize();		
 	}	
+	
+	
+	public void crossdiv(int n, Pointer m1dw, Pointer m2dw, Pointer m1w, Pointer m2w, Pointer outdw) 
+	{
+		cuModuleGetFunction(function, module, "crossdiv");
+		Pointer kernelParameters = Pointer.to(
+                Pointer.to(new int[]{n}),
+                Pointer.to(m1dw),
+                Pointer.to(m2dw),
+                Pointer.to(m1w),
+                Pointer.to(m2w),
+                Pointer.to(outdw)
+        );
+		
+		int gridSizeX = (n + blockSizeX - 1) / blockSizeX;
+		cuLaunchKernel(function,
+	            gridSizeX,  1, 1,      // Grid dimension
+	            blockSizeX, 1, 1,      // Block dimension
+	            0, null,               // Shared memory size and stream
+	            kernelParameters, null // Kernel- and extra parameters
+	        );
+	    cuCtxSynchronize();		
+	}	
+	
+	
+	
 	
 	public void concat(int n, int shift, Pointer outw, Pointer outdw, Pointer outstepcache, 
 			              Pointer w, Pointer dw, Pointer stepcache) 
@@ -1162,5 +1203,24 @@ public class Graph {
         }
         return C;
     }
+
+	public void maximum(final Matrix m1, final Matrix m2, final Matrix out) throws Exception {
+		
+		if (m1.rows != m2.rows || m1.cols != m2.cols) {
+			throw new Exception("matrix dimension mismatch");
+		}
+	
+		maximum(m1.size, m1.w, m2.w, out.w);
+
+		if (this.applyBackprop) {
+			Runnable bp = new Runnable() {
+				public void run() {
+					maximumback(m1.size, m1.dw, m2.dw, out.dw);	
+				}
+			};
+			backprop.add(bp);
+		}
+		
+	}
 	
 }
