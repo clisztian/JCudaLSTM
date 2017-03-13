@@ -236,6 +236,55 @@ public class Matrix implements Serializable {
         //this.printMatrix();
 	}
 	
+	public Matrix(double[] v, int rows) {
+		
+		this.rows = rows;
+		this.cols = v.length/rows;
+		this.size = v.length*rows;
+		
+		w = new Pointer();
+		dw = new Pointer();
+		stepCache = new Pointer();
+		
+		cudaMalloc(w, this.size * Sizeof.DOUBLE);
+        cudaMalloc(dw, this.size * Sizeof.DOUBLE);
+        cudaMalloc(stepCache, this.size * Sizeof.DOUBLE);
+		
+        cudaMemcpy(w, Pointer.to(v), this.size * Sizeof.DOUBLE,
+    	        cudaMemcpyHostToDevice);
+        
+        // Initiate dw and cache to 0 vectors
+        zerosFromHost();
+ 
+        //this.printMatrix();
+	}
+	
+	public Matrix(double[] v, int rows, int nbatch) throws Exception {
+		
+        if(v.length != rows*nbatch) { 
+			
+			throw new Exception("matrix dimension mismatch: this vs copy = " + v.length + " " + rows*nbatch);
+		}
+				
+		this.rows = rows;
+		this.cols = nbatch;
+		this.size = v.length;
+		
+		w = new Pointer();
+		dw = new Pointer();
+		stepCache = new Pointer();
+		
+		cudaMalloc(w, this.size * Sizeof.DOUBLE);
+        cudaMalloc(dw, this.size * Sizeof.DOUBLE);
+        cudaMalloc(stepCache, this.size * Sizeof.DOUBLE);
+		
+        cudaMemcpy(w, Pointer.to(v), this.size * Sizeof.DOUBLE,
+    	        cudaMemcpyHostToDevice);
+        
+        zerosFromHost();
+	}
+	
+	
 	public Matrix(){
 		
 	}

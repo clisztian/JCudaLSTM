@@ -48,7 +48,7 @@ public class LstmLayer implements Model {
 	private static final long serialVersionUID = 1L;
 	int inputDimension;
 	int outputDimension;
-	int inputCols;
+	int nbatch;
 	int nsteps; 
 	
 	public CUmodule module; 
@@ -113,7 +113,7 @@ public class LstmLayer implements Model {
 	
 	
 	
-	public LstmLayer(int inputDimension, int outputDimension, int inputCols, double initParamsStdDev, curandGenerator rng, int seed) {
+	public LstmLayer(int inputDimension, int outputDimension, int nbatch, double initParamsStdDev, curandGenerator rng, int seed) {
 		
 		curandSetPseudoRandomGeneratorSeed(rng, seed);
 		prepareCuda();
@@ -126,7 +126,7 @@ public class LstmLayer implements Model {
 		
 		this.inputDimension = inputDimension;
 		this.outputDimension = outputDimension;
-		this.inputCols = inputCols;
+		this.nbatch = nbatch;
 		
 		Wix = Matrix.rand(outputDimension, inputDimension, initParamsStdDev, rng);
 		Wih = Matrix.rand(outputDimension, outputDimension, initParamsStdDev, rng);
@@ -146,10 +146,10 @@ public class LstmLayer implements Model {
 		
 		
 		lstmCells = new ArrayList<LstmCell>();
-		lstmCells.add(LstmCell.zeros(inputDimension, outputDimension, inputCols));
+		lstmCells.add(LstmCell.zeros(inputDimension, outputDimension, nbatch));
 		
-		hidden0 = Matrix.zeros(outputDimension, inputCols);
-		cell0 = Matrix.zeros(outputDimension, inputCols);
+		hidden0 = Matrix.zeros(outputDimension, nbatch);
+		cell0 = Matrix.zeros(outputDimension, nbatch);
 		
 		hiddenContent = hidden0;
 		cellContent = cell0;
@@ -210,7 +210,7 @@ public class LstmLayer implements Model {
 	{
 		
 		if(nsteps == lstmCells.size()) {
-			lstmCells.add(LstmCell.zeros(inputDimension, outputDimension, inputCols));
+			lstmCells.add(LstmCell.zeros(inputDimension, outputDimension, nbatch));
 		}
 					
 		g.mul(Wix, input, lstmCells.get(nsteps).outmul0);
@@ -418,7 +418,7 @@ public class LstmLayer implements Model {
 				layers.add(new LstmLayer(hiddenDimension, hiddenDimension, inputCols, initParamsStdDev, rng, h));
 			}
 		}
-		layers.add(new FeedForwardLayer(hiddenDimension, outputDimension, decoderUnit, initParamsStdDev, rng, hiddenLayers+1));
+		layers.add(new FeedForwardLayer(hiddenDimension, outputDimension, 1, decoderUnit, initParamsStdDev, rng, hiddenLayers+1));
 		return layers;
 	}
 	
@@ -486,7 +486,6 @@ public class LstmLayer implements Model {
         // Obtain the function pointer to the "add" function from the module
         function = new CUfunction();				
 		
-		int count = 0;
 		Graph g = new Graph();
 		Loss lossReporting = data.lossReporting;
 		Loss lossTraining = data.lossTraining;
@@ -498,7 +497,6 @@ public class LstmLayer implements Model {
 		for(int i = 0; i < number_epochs; i++)
 		{
 			
-		  count = 0;
 		  numerLoss = 0;
 		  denomLoss = 0;		
 			
@@ -532,9 +530,6 @@ public class LstmLayer implements Model {
 				}
 				
 			}
-			//System.out.println("Loss at " + count + " = " + numerLoss/denomLoss);			
-			count++;
-
 			if(numerLoss/denomLoss == 0) {break;}
 			
 			if (applyTraining) {

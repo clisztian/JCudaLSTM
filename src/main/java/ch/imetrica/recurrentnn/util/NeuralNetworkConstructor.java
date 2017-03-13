@@ -28,7 +28,7 @@ public class NeuralNetworkConstructor {
 				layers.add(new LstmLayer(hiddenDimension, hiddenDimension, inputCols, initParamsStdDev, rng, h));
 			}
 		}
-		layers.add(new FeedForwardLayer(hiddenDimension, outputDimension, decoderUnit, initParamsStdDev, rng, hiddenLayers+1));
+		layers.add(new FeedForwardLayer(hiddenDimension, outputDimension, 1, decoderUnit, initParamsStdDev, rng, hiddenLayers+1));
 		return new NeuralNetwork(layers);
 	}
 	
@@ -43,26 +43,26 @@ public class NeuralNetworkConstructor {
 				layers.add(new LstmLayer(hiddenDimension, hiddenDimension, inputCols, initParamsStdDev, rng, h+1));
 			}
 		}
-		layers.add(new FeedForwardLayer(hiddenDimension, outputDimension, decoderUnit, initParamsStdDev, rng, hiddenLayers + 2));
+		layers.add(new FeedForwardLayer(hiddenDimension, outputDimension, 1, decoderUnit, initParamsStdDev, rng, hiddenLayers + 2));
 		return new NeuralNetwork(layers);
 	}
 	
 	public static NeuralNetwork makeFeedForward(int inputDimension, int hiddenDimension, int hiddenLayers, int outputDimension, Nonlinearity hiddenUnit, Nonlinearity decoderUnit, double initParamsStdDev, curandGenerator rng) {
 		List<Model> layers = new ArrayList<>();
 		if (hiddenLayers == 0) {
-			layers.add(new FeedForwardLayer(inputDimension, outputDimension, decoderUnit, initParamsStdDev, rng, 0));
+			layers.add(new FeedForwardLayer(inputDimension, outputDimension, 1, decoderUnit, initParamsStdDev, rng, 0));
 			return new NeuralNetwork(layers);
 		}
 		else {
 			for (int h = 0; h < hiddenLayers; h++) {
 				if (h == 0) {
-					layers.add(new FeedForwardLayer(inputDimension, hiddenDimension, hiddenUnit, initParamsStdDev, rng, h + 1));
+					layers.add(new FeedForwardLayer(inputDimension, hiddenDimension, 1, hiddenUnit, initParamsStdDev, rng, h + 1));
 				}
 				else {
-					layers.add(new FeedForwardLayer(hiddenDimension, hiddenDimension, hiddenUnit, initParamsStdDev, rng, h + 1));
+					layers.add(new FeedForwardLayer(hiddenDimension, hiddenDimension, 1, hiddenUnit, initParamsStdDev, rng, h + 1));
 				}
 			}
-			layers.add(new FeedForwardLayer(hiddenDimension, outputDimension, decoderUnit, initParamsStdDev, rng, hiddenLayers + 1));
+			layers.add(new FeedForwardLayer(hiddenDimension, outputDimension, 1, decoderUnit, initParamsStdDev, rng, hiddenLayers + 1));
 			return new NeuralNetwork(layers);
 		}
 	}
@@ -77,7 +77,7 @@ public class NeuralNetworkConstructor {
 				layers.add(new GruLayer(hiddenDimension, hiddenDimension, inputCols, initParamsStdDev, rng, h+1));
 			}
 		}
-		layers.add(new FeedForwardLayer(hiddenDimension, outputDimension, decoderUnit, initParamsStdDev, rng, hiddenLayers + 1));
+		layers.add(new FeedForwardLayer(hiddenDimension, outputDimension, 1, decoderUnit, initParamsStdDev, rng, hiddenLayers + 1));
 		return new NeuralNetwork(layers);
 	}
 	
@@ -91,7 +91,7 @@ public class NeuralNetworkConstructor {
 				layers.add(new RnnLayer(hiddenDimension, hiddenDimension, hiddenUnit, initParamsStdDev, rng));
 			}
 		}
-		layers.add(new FeedForwardLayer(hiddenDimension, outputDimension, decoderUnit, initParamsStdDev, rng, hiddenLayers + 1));
+		layers.add(new FeedForwardLayer(hiddenDimension, outputDimension, 1, decoderUnit, initParamsStdDev, rng, hiddenLayers + 1));
 		return new NeuralNetwork(layers);
 	}
 }

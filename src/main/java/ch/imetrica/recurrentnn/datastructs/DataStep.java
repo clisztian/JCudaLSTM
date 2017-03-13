@@ -27,6 +27,20 @@ public class DataStep implements Serializable {
 		}
 	}
 	
+	public DataStep(double[] input, double[] targetOutput, int nbatch) {
+		this.input = new Matrix(input, 1);
+		if (targetOutput != null) {
+			this.targetOutput = new Matrix(targetOutput, 1);
+		}
+	}
+	
+	public DataStep(double[] input, double[] targetOutput, int nrows, int nbatch) throws Exception {
+		this.input = new Matrix(input, nrows, nbatch);
+		if (targetOutput != null) {
+			this.targetOutput = new Matrix(targetOutput, nrows, nbatch);
+		}
+	}
+	
 	public void destroyStep()
 	{
 		input.destroyMatrix();

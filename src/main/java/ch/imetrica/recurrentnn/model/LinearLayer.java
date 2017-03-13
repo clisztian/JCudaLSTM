@@ -25,7 +25,7 @@ public class LinearLayer implements Model {
 	Matrix W;
 	int inputDimension;
 	int outputDimension;
-	int inputCols;
+	int nbatch;
 	private CUmodule module; 
 	private CUfunction function;
 	
@@ -37,7 +37,7 @@ public class LinearLayer implements Model {
 		
 		this.outputDimension = outputDimension; 
 		this.inputDimension = inputDimension;
-		this.inputCols = n_cols;
+		this.nbatch = n_cols;
 		
 		W = Matrix.rand(outputDimension, inputDimension, initParamsStdDev, rng);
 		
@@ -60,7 +60,7 @@ public class LinearLayer implements Model {
 	public void static_forward(Matrix input, Graph g) throws Exception 
 	{
 		if(nsteps == linearCell.size()) {
-			linearCell.add(LinearCell.zeros(inputDimension, outputDimension, inputCols));
+			linearCell.add(LinearCell.zeros(inputDimension, outputDimension, nbatch));
 		}
 		
 		g.mul(W, input, linearCell.get(nsteps).outmul);

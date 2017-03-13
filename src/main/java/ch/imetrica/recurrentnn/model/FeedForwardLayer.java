@@ -46,6 +46,7 @@ public class FeedForwardLayer implements Model {
 	
 	int outputDimension;
 	int inputDimension;
+	int nbatch;
 	int nsteps = 0;
 	
 	Matrix W;
@@ -85,19 +86,20 @@ public class FeedForwardLayer implements Model {
 	  prepare();
 	}
 	
-	public FeedForwardLayer(int inputDimension, int outputDimension, Nonlinearity f, double initParamsStdDev, curandGenerator rng, int seed) {
+	public FeedForwardLayer(int inputDimension, int outputDimension, int nbatch, Nonlinearity f, double initParamsStdDev, curandGenerator rng, int seed) {
 
 		this.outputDimension = outputDimension; 
 		this.inputDimension = inputDimension;
+		this.nbatch = nbatch;
 		
 		curandSetPseudoRandomGeneratorSeed(rng, seed);
 		W = Matrix.rand(outputDimension, inputDimension, initParamsStdDev, rng);
-		b = Matrix.zeros(outputDimension);
+		b = Matrix.zeros(outputDimension, nbatch);
 		this.f = f;
 
 		
 		ffCell = new ArrayList<FFCell>();
-		ffCell.add(FFCell.zeros(inputDimension, outputDimension, b.cols));
+		ffCell.add(FFCell.zeros(inputDimension, outputDimension, nbatch));
 		
 		
 		nsteps = 0;
@@ -136,7 +138,7 @@ public class FeedForwardLayer implements Model {
 			ffCell.add(FFCell.zeros(inputDimension, outputDimension, b.cols));
 		}
 		
-		g.mul(W, input, ffCell.get(nsteps).outmul);
+		g.mul(W, input, ffCell.get(nsteps).outmul);  
 		g.add(ffCell.get(nsteps).outmul, b, ffCell.get(nsteps).outsum);
 		g.nonlin(f, ffCell.get(nsteps).outsum, ffCell.get(nsteps).outnonlin);	
 		
@@ -291,7 +293,7 @@ public class FeedForwardLayer implements Model {
 		}
 	}
 	
-	public void testFFN(List<DataSequence> traindata, List<DataSequence> testdata, int number_epochs, curandGenerator rng) throws Exception
+	public void testFFN(List<DataSequence> traindata, List<DataSequence> testdata, int nbatch, int number_epochs, curandGenerator rng) throws Exception
 	{
 		
 		double numerLoss = 0;
@@ -304,6 +306,7 @@ public class FeedForwardLayer implements Model {
 		double regularization = 0.000001; 
 		double intStdDev = 0.08;
 		
+	
 		int inputDimension = 1;
 		int hiddenDimension = 50;
 		int hiddenLayers = 1; 
@@ -339,7 +342,7 @@ public class FeedForwardLayer implements Model {
 		Loss lossReporting = new LossSumOfSquares();
 		Loss lossTraining = new LossSumOfSquares();
 		
-		List<FeedForwardLayer> feedForwardNet = makeFeedForward(inputDimension, hiddenDimension, hiddenLayers, outputDimension,
+		List<FeedForwardLayer> feedForwardNet = makeFeedForward(inputDimension, hiddenDimension, nbatch, hiddenLayers, outputDimension,
 				hiddenUnit, fInputGate, intStdDev, rng);
 				
 		
@@ -383,6 +386,8 @@ public class FeedForwardLayer implements Model {
 		  }
 		  if(i%10 == 0) {
 			  System.out.println("Epoch " + i + " average loss = " + numerLoss/denomLoss);
+			  
+			  printParameters(feedForwardNet);
 		  }
 		}
 		
@@ -423,53 +428,54 @@ public class FeedForwardLayer implements Model {
 	
 	
 	
-	public static List<FeedForwardLayer> makeFeedForward(int inputDimension, int hiddenDimension, int hiddenLayers, int outputDimension, 
+	public static List<FeedForwardLayer> makeFeedForward(int inputDimension, int hiddenDimension, int nbatch, int hiddenLayers, int outputDimension, 
 			  Nonlinearity hiddenUnit, Nonlinearity decoderUnit, double initParamsStdDev, curandGenerator rng) {
 		
 		List<FeedForwardLayer> layers = new ArrayList<>();
 		
 		if (hiddenLayers == 0) {
-			layers.add(new FeedForwardLayer(inputDimension, outputDimension, decoderUnit, initParamsStdDev, rng, 0));
+			layers.add(new FeedForwardLayer(inputDimension, outputDimension, nbatch, decoderUnit, initParamsStdDev, rng, 0));
 			return layers;
 		}
 		else {
 			for (int h = 0; h < hiddenLayers; h++) {
 				if (h == 0) {
 					
-					layers.add(new FeedForwardLayer(inputDimension, hiddenDimension, hiddenUnit, initParamsStdDev, rng, h+1));
+					layers.add(new FeedForwardLayer(inputDimension, hiddenDimension, nbatch, hiddenUnit, initParamsStdDev, rng, h+1));
 				}
 				else {
-					layers.add(new FeedForwardLayer(hiddenDimension, hiddenDimension, hiddenUnit, initParamsStdDev, rng, h+1));
+					layers.add(new FeedForwardLayer(hiddenDimension, hiddenDimension, nbatch, hiddenUnit, initParamsStdDev, rng, h+1));
 				}
 			}
 			
-			layers.add(new FeedForwardLayer(hiddenDimension, outputDimension, decoderUnit, initParamsStdDev, rng, hiddenLayers+1));
+			layers.add(new FeedForwardLayer(hiddenDimension, outputDimension, nbatch, decoderUnit, initParamsStdDev, rng, hiddenLayers+1));
 			
 			return layers;
 		}
 	}
 	
 	
-	public static List<DataSequence> makeDataSequence(int n, int seed)
+	public static List<DataSequence> makeDataSequence(int n, int seed, int nbatch) throws Exception
 	{
 		List<DataSequence> mydata = new ArrayList<>();
 		
-		double[] input = new double[1];
-		double[] target = new double[1];
+		double[] input = new double[nbatch];
+		double[] target = new double[nbatch];
 		Random random = new Random(seed);
 		
 		for(int i = 0; i < n; i++)
 		{
-						
-			input[0] = -1.0 + 2*random.nextDouble();
-			target[0] = Math.sin(input[0]*Math.PI);
-						
-			List<DataStep> element = new ArrayList<>();
-			element.add(new DataStep(input, target));
-			mydata.add(new DataSequence(element));
+			
+		  for(int j = 0; j < nbatch; j++)
+		  {
+			input[j] = -1.0 + 2*random.nextDouble();
+			target[j] = Math.sin(input[j]*Math.PI);
+		  }				
+		  List<DataStep> element = new ArrayList<>();
+		  element.add(new DataStep(input, target, 1, nbatch));
+		  mydata.add(new DataSequence(element)); 
 		}
 		
-
 		return mydata;
 	}
 	
@@ -489,7 +495,7 @@ public class FeedForwardLayer implements Model {
 		double gradientClipValue = 5;
 		double regularization = 0.000001; 
 		
-		
+		int nbatch = 10;
 		int inputDimension = 200;
 		int outputDimension = 100;
 		double initParamsStdDev = 0.08;
@@ -504,10 +510,10 @@ public class FeedForwardLayer implements Model {
         curandCreateGenerator(rng, CURAND_RNG_PSEUDO_DEFAULT);
         curandSetPseudoRandomGeneratorSeed(rng, 1234);
         
-        Matrix input = Matrix.rand(200, 1, .1, rng);
+        Matrix input = Matrix.rand(200, nbatch, .1, rng);
         
         System.out.println("Construct forward feed...");
-		FeedForwardLayer ffl = new FeedForwardLayer(inputDimension, outputDimension, fInputGate, initParamsStdDev, rng, 10);
+		FeedForwardLayer ffl = new FeedForwardLayer(inputDimension, outputDimension, nbatch, fInputGate, initParamsStdDev, rng, 10);
 		
 		
 		
@@ -590,18 +596,19 @@ public class FeedForwardLayer implements Model {
 		   curandCreateGenerator(generator, CURAND_RNG_PSEUDO_DEFAULT);
 		   curandSetPseudoRandomGeneratorSeed(generator, 1);
 		   
+		   int nbatch = 5;
 
 		   try{
 			   
-			   List<DataSequence> train = makeDataSequence(500, 1);
-			   List<DataSequence> test = makeDataSequence(50, 123);
+			   List<DataSequence> train = makeDataSequence(500, 1, nbatch);
+			   List<DataSequence> test = makeDataSequence(50, 123, nbatch);
 			   
 //			   System.out.println("mydata size = " + mydata.size());
 //			   for(int i = 0; i < mydata.size(); i++) {
 //				   System.out.println(mydata.get(i).toString());
 //			   }
 
-			   ffl.testFFN(train, test, 100, generator);
+			   ffl.testFFN(train, test, nbatch, 100, generator);
 
 			   
 			   for(int i = 0; i < train.size(); i++) {

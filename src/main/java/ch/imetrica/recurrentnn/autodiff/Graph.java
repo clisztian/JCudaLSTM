@@ -139,6 +139,34 @@ public class Graph {
 	        "		m2dw[n*l + j] += m1w[i*k + l]*b;" + "\n" +
 	        "	  }" + "\n" +
 	        "   }" + "\n" +
+	        "}" + "\n" + 
+	        "extern \"C\"" + "\n" +
+	        "__global__ void maximum(int n, double *m1, double *val, double *out) {" + "\n" +
+	        "   int i = blockIdx.x*blockDim.x+threadIdx.x;" + "\n" +
+	        "   if (i<n)" + "\n" +
+	        "   {" + "\n" +
+	        "     if(m1[i] > val[i])" + "\n" + 
+	        "     {"  + "\n" +
+	        "        out[i] = m1[i];" + "\n" +
+	        "     }" + "\n" +
+	        "     else {"  + "\n" +
+	        "        out[i] = val[i];"  + "\n" +
+	        "     }" + "\n" +
+	        "   }" + "\n" +
+	        "}" + "\n\n" + 
+	        "extern \"C\"" + "\n" +
+	        "__global__ void maximumback(int n, double *m1, double *val, double *out) {" + "\n" +
+	        "   int i = blockIdx.x*blockDim.x+threadIdx.x;" + "\n" +
+	        "   if (i<n)" + "\n" +
+	        "   {" + "\n" +
+	        "     if(m1[i] > val[i])" + "\n" + 
+	        "     {"  + "\n" +
+	        "        m1[i] = out[i];" + "\n" +
+	        "     }" + "\n" +
+	        "     else {"  + "\n" +
+	        "        m1[i] = out[i];"  + "\n" +
+	        "     }" + "\n" +
+	        "   }" + "\n" +
 	        "}" + "\n\n";
 
 
@@ -283,6 +311,29 @@ public class Graph {
 		}
 		return out;
 	}
+	
+	
+	public void maximum(final Matrix m1, double val, final Matrix out) throws Exception {
+
+		if (m1.rows != out.rows || m1.cols != out.cols) {
+			throw new Exception("matrix dimension mismatch");
+		}
+	
+		
+		
+		
+		if (this.applyBackprop) {
+			Runnable bp = new Runnable() {
+				public void run() {
+										
+				}
+			};
+			backprop.add(bp);
+		}
+	}
+	
+	
+	
 	
 	
 	public Matrix add(final Matrix m1, final Matrix m2) throws Exception {
@@ -625,6 +676,46 @@ public class Graph {
 		cuCtxSynchronize();		
 	}	
 	
+	
+	public void maximum(int n, Pointer a, Pointer anew, Pointer out) 
+	{
+		cuModuleGetFunction(function, module, "maximum");
+		Pointer kernelParameters = Pointer.to(
+				Pointer.to(new int[]{n}),
+				Pointer.to(a),
+				Pointer.to(anew),
+				Pointer.to(out)
+		);
+
+		int gridSizeX = (n + blockSizeX - 1) / blockSizeX;
+		cuLaunchKernel(function, 
+				gridSizeX,  1, 1,      // Grid dimension
+				blockSizeX, 1, 1,      // Block dimension
+				0, null,               // Shared memory size and stream
+				kernelParameters, null // Kernel- and extra parameters
+		);
+		cuCtxSynchronize();		
+	}	
+	
+	public void maximumback(int n, Pointer a, Pointer anew, Pointer out) 
+	{
+		cuModuleGetFunction(function, module, "maximumback");
+		Pointer kernelParameters = Pointer.to(
+				Pointer.to(new int[]{n}),
+				Pointer.to(a),
+				Pointer.to(anew),
+				Pointer.to(out)
+		);
+
+		int gridSizeX = (n + blockSizeX - 1) / blockSizeX;
+		cuLaunchKernel(function, 
+				gridSizeX,  1, 1,      // Grid dimension
+				blockSizeX, 1, 1,      // Block dimension
+				0, null,               // Shared memory size and stream
+				kernelParameters, null // Kernel- and extra parameters
+		);
+		cuCtxSynchronize();		
+	}	
 	
 	public static void printPointer(int size, Pointer v)
 	{

@@ -50,7 +50,7 @@ public class GruLayer implements Model {
 	private static final long serialVersionUID = 1L;
 	int inputDimension;
 	int outputDimension;
-	int inputCols;
+	int nbatch;
 	int nsteps;
 	
 	public CUmodule module; 
@@ -119,7 +119,7 @@ public class GruLayer implements Model {
 
 		this.inputDimension = inputDimension;
 		this.outputDimension = outputDimension;
-		this.inputCols = inputCols;
+		this.nbatch = inputCols;
 		
 		fMix = new SigmoidUnit();
 		fReset = new SigmoidUnit();
@@ -205,7 +205,7 @@ public class GruLayer implements Model {
 	{
 		
 		if(nsteps == gruCells.size()) {
-			gruCells.add(GRUCell.zeros(inputDimension, outputDimension, inputCols));
+			gruCells.add(GRUCell.zeros(inputDimension, outputDimension, nbatch));
 		}
 		
 		g.mul(IHmix, input, gruCells.get(nsteps).outmul0);

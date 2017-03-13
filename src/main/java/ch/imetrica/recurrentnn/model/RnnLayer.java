@@ -14,6 +14,7 @@ public class RnnLayer implements Model {
 	private static final long serialVersionUID = 1L;
 	int inputDimension;
 	int outputDimension;
+	int nbatch; 
 	
 	Matrix W, b;
 	Matrix context;
