@@ -195,6 +195,8 @@ public class Matrix implements Serializable {
 	}
 	
 	
+	
+	
 	public Matrix(int dim) {
 
 		this.rows = dim;
@@ -308,6 +310,12 @@ public class Matrix implements Serializable {
 		return result;
 	}
 	
+	public void set(double[] v)
+	{
+		cudaMemcpy(w, Pointer.to(v), this.size * Sizeof.DOUBLE,
+    	        cudaMemcpyHostToDevice);
+	}
+	
 	
     public void rand(double initParamsStdDev, curandGenerator generator) 
     {
@@ -379,6 +387,18 @@ public class Matrix implements Serializable {
 
 		return result;
     }
+    
+    public void resetToSmall() 
+    {
+    	
+    	double hostData[] = new double[this.size];
+	    Arrays.fill(hostData, -Double.MAX_VALUE);
+	    
+	    cudaMemcpy(this.w, Pointer.to(hostData), this.size * Sizeof.DOUBLE,
+	        cudaMemcpyHostToDevice);  
+    }
+    
+    
     
     public static Matrix zeros(int rows) 
     {
@@ -1615,6 +1635,12 @@ public class Matrix implements Serializable {
 	    // Allocate device memory, and copy the input data to the device
 	    cudaMemcpy(dw, Pointer.to(hostData), this.size * Sizeof.DOUBLE,
 		        cudaMemcpyHostToDevice); 		
+	}
+
+	public void clone(double[] start) {
+		
+		cudaMemcpy(this.w, Pointer.to(start), this.size * Sizeof.DOUBLE,
+		        cudaMemcpyHostToDevice);
 	}	
 	
 //	public void identity() {

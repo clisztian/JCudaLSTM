@@ -109,6 +109,28 @@ public class Graph {
 	        "    }" + "\n" +
 	        "}" + "\n\n" + 
 	        "extern \"C\"" + "\n" +
+	        "__global__ void sub(int n, double *m1, double *m2, double *outdw)" + "\n" +
+	        "{" + "\n" +
+	        "    int i = blockIdx.x * blockDim.x + threadIdx.x;" + "\n" +
+	        "    if (i<n)" + "\n" +
+	        "    {" + "\n" +
+	        "        outdw[i] = m1[i] - m2[i];" + "\n" +
+	        "    }" + "\n" +
+	        "}" + "\n\n" + 
+	        "__global__ void subback(int n, double *m1dw, double *m2dw, double *outdw)" + "\n" +
+	        "{" + "\n" +
+	        "    int i = blockIdx.x * blockDim.x + threadIdx.x;" + "\n" +
+	        "    if (i<n)" + "\n" +
+	        "    {" + "\n" +
+	        "        m1dw[i] = m1dw[i] + outdw[i];" + "\n" +
+	        "        m2dw[i] = m2dw[i] - outdw[i];" + "\n" +
+	        "    }" + "\n" +
+	        "}" + "\n\n" + 
+	        
+	        
+	        
+	        
+	        "extern \"C\"" + "\n" +
 	        "__global__ void elemult(int n, double *a, double *b, double *out)" + "\n" +
 	        "{" + "\n" +
 	        "    int i = blockIdx.x * blockDim.x + threadIdx.x;" + "\n" +
@@ -127,6 +149,8 @@ public class Graph {
 	        "        m2dw[i] = m2dw[i] + m1w[i] * outdw[i];" + "\n" +
 	        "    }" + "\n" +
 	        "}" + "\n\n" +
+	        
+	        "extern \"C\"" + "\n" +
 	        "__global__ void elediv(int n, double *a, double *b, double *out)" + "\n" +
 	        "{" + "\n" +
 	        "    int i = blockIdx.x * blockDim.x + threadIdx.x;" + "\n" +
@@ -135,6 +159,8 @@ public class Graph {
 	        "        out[i] = a[i]/b[i];" + "\n" +
 	        "    }" + "\n" +
 	        "}" + "\n\n" + 
+	        
+	        "extern \"C\"" + "\n" +
 	        "__global__ void crossdiv(int n, double *m1dw, double *m2dw, double *m1w, double *m2w, double *outdw)" + "\n" +
 	        "{" + "\n" +
 	        "    int i = blockIdx.x * blockDim.x + threadIdx.x;" + "\n" +
@@ -144,6 +170,7 @@ public class Graph {
 	        "        m2dw[i] = m2dw[i] - m1w[i] * outdw[i]/(m2w[i] * m2w[i]);" + "\n" +
 	        "    }" + "\n" +
 	        "}" + "\n\n" +
+	        
 	        "extern \"C\"" + "\n" +
 	        "__global__ void mmKernel(int m, int k, int n, double *m1dw, double *m2dw, double *m1w, double *m2w, double *outdw) {" + "\n" +
 	        "   int i = blockIdx.x*blockDim.x+threadIdx.x;" + "\n" +
@@ -158,30 +185,32 @@ public class Graph {
 	        "   }" + "\n" +
 	        "}" + "\n" + 
 	        "extern \"C\"" + "\n" +
-	        "__global__ void maximum(int n, double *m1, double *val, double *out) {" + "\n" +
+	        "__global__ void maximum(int n, double *m1, double *m2, double *m1cache, double *out) {" + "\n" +
 	        "   int i = blockIdx.x*blockDim.x+threadIdx.x;" + "\n" +
 	        "   if (i<n)" + "\n" +
 	        "   {" + "\n" +
-	        "     if(m1[i] > val[i])" + "\n" + 
+	        "     if(m1[i] > m2[i])" + "\n" + 
 	        "     {"  + "\n" +
 	        "        out[i] = m1[i];" + "\n" +
+	        "        m1cache[i] = 1;" + "\n" +
 	        "     }" + "\n" +
 	        "     else {"  + "\n" +
-	        "        out[i] = val[i];"  + "\n" +
+	        "        out[i] = m2[i];"  + "\n" +
+	        "        m1cache[i] = 0;" + "\n" +
 	        "     }" + "\n" +
 	        "   }" + "\n" +
 	        "}" + "\n\n" + 
 	        "extern \"C\"" + "\n" +
-	        "__global__ void maximumback(int n, double *m1, double *val, double *out) {" + "\n" +
+	        "__global__ void maximumback(int n, double *m1dw, double *m2dw, double *m1cache, double *out) {" + "\n" +
 	        "   int i = blockIdx.x*blockDim.x+threadIdx.x;" + "\n" +
 	        "   if (i<n)" + "\n" +
 	        "   {" + "\n" +
-	        "     if(m1[i] > val[i])" + "\n" + 
+	        "     if(m1cache[i] > 0)" + "\n" + 
 	        "     {"  + "\n" +
-	        "        m1[i] = out[i];" + "\n" +
+	        "        m1dw[i] += out[i];" + "\n" +
 	        "     }" + "\n" +
 	        "     else {"  + "\n" +
-	        "        m1[i] = out[i];"  + "\n" +
+	        "        m2dw[i] += out[i];"  + "\n" +
 	        "     }" + "\n" +
 	        "   }" + "\n" +
 	        "}" + "\n\n";
@@ -253,7 +282,56 @@ public class Graph {
 		add(m1, negM, out);
 	}
 	
+    public void sub(final Matrix m1, final Matrix m2, final Matrix out) throws Exception {
+    	
+    	if (m1.rows != m2.rows || m1.cols != m2.cols) {
+			throw new Exception("matrix dimension mismatch");
+		}
+		elesub(out.size, m1.w, m2.w, out.w);
+		
+		if (this.applyBackprop) {
+			Runnable bp = new Runnable() {
+				public void run() {
+
+					Pointer one = Pointer.to(new double[]{ 1.0 });
+					Pointer negone = Pointer.to(new double[]{ -1.0 });
+									
+					cublasDaxpy(handle, m1.size, one, out.dw, 1, m1.dw, 1);
+					cublasDaxpy(handle, m2.size, negone, out.dw, 1, m2.dw, 1);					
+				}
+			};
+			backprop.add(bp);
+		}
+	}	
+
+    public Matrix sub(final Matrix m1, final Matrix m2) throws Exception {
+    	
+    	if (m1.rows != m2.rows || m1.cols != m2.cols) {
+			throw new Exception("matrix dimension mismatch");
+		}
+    	final Matrix out = new Matrix(m1.rows, m1.cols);
+    	
+		elesub(out.size, m1.w, m2.w, out.w);
+		
+		if (this.applyBackprop) {
+			Runnable bp = new Runnable() {
+				public void run() {
+
+					Pointer one = Pointer.to(new double[]{ 1.0 });
+					Pointer negone = Pointer.to(new double[]{ -1.0 });
+									
+					cublasDaxpy(handle, m1.size, one, out.dw, 1, m1.dw, 1);
+					cublasDaxpy(handle, m2.size, negone, out.dw, 1, m2.dw, 1);					
+				}
+			};
+			backprop.add(bp);
+		}
+		
+		return out;
+	}	
 	
+    
+    
 	public Matrix neg(final Matrix m) throws Exception {
 		Matrix negones = Matrix.negones(m.rows, m.cols);
 		Matrix out = elmul(negones, m);
@@ -424,6 +502,27 @@ public class Graph {
 			backprop.add(bp);
 		}
 	}		
+	
+	public Matrix eldiv(final Matrix m1, final Matrix m2) throws Exception {
+		if (m1.rows != m2.rows || m1.cols != m2.cols) {
+			throw new Exception("matrix dimension mismatch");
+		}
+		final Matrix out = new Matrix(m1.rows, m1.cols);	
+		
+		elediv(out.size, m1.w, m2.w, out.w);
+
+		if (this.applyBackprop) {
+			Runnable bp = new Runnable() {
+				public void run() {
+					crossdiv(out.size, m1.dw, m2.dw, m1.w, m2.w, out.dw);
+				}
+			};
+			backprop.add(bp);
+		}
+		
+		return out;
+	}
+	
 	
 	public Matrix mul(final Matrix m1, final Matrix m2) throws Exception {		
 		if (m1.cols != m2.rows) {
@@ -616,7 +715,26 @@ public class Graph {
 	        );
 	    cuCtxSynchronize();		
 	}
-	
+
+	public void elesub(int n, Pointer a, Pointer b, Pointer out) 
+	{
+		cuModuleGetFunction(function, module, "sub");
+		Pointer kernelParameters = Pointer.to(
+                Pointer.to(new int[]{n}),
+                Pointer.to(a),
+                Pointer.to(b),
+                Pointer.to(out)
+        );
+		
+		int gridSizeX = (n + blockSizeX - 1) / blockSizeX;
+		cuLaunchKernel(function,
+	            gridSizeX,  1, 1,      // Grid dimension
+	            blockSizeX, 1, 1,      // Block dimension
+	            0, null,               // Shared memory size and stream
+	            kernelParameters, null // Kernel- and extra parameters
+	        );
+	    cuCtxSynchronize();		
+	}	
 	
 	
 	public void crossmult(int n, Pointer m1dw, Pointer m2dw, Pointer m1w, Pointer m2w, Pointer outdw) 
@@ -718,13 +836,14 @@ public class Graph {
 	}	
 	
 	
-	public void maximum(int n, Pointer a, Pointer anew, Pointer out) 
+	public void maximum(int n, Pointer m1, Pointer m2, Pointer m1cache, Pointer out) 
 	{
 		cuModuleGetFunction(function, module, "maximum");
 		Pointer kernelParameters = Pointer.to(
 				Pointer.to(new int[]{n}),
-				Pointer.to(a),
-				Pointer.to(anew),
+				Pointer.to(m1),
+				Pointer.to(m2),
+				Pointer.to(m1cache),
 				Pointer.to(out)
 		);
 
@@ -738,13 +857,14 @@ public class Graph {
 		cuCtxSynchronize();		
 	}	
 	
-	public void maximumback(int n, Pointer a, Pointer anew, Pointer out) 
+	public void maximumback(int n, Pointer m1dw, Pointer m2dw, Pointer m1cache, Pointer out) 
 	{
 		cuModuleGetFunction(function, module, "maximumback");
 		Pointer kernelParameters = Pointer.to(
 				Pointer.to(new int[]{n}),
-				Pointer.to(a),
-				Pointer.to(anew),
+				Pointer.to(m1dw),
+				Pointer.to(m2dw),
+				Pointer.to(m1cache),
 				Pointer.to(out)
 		);
 
@@ -1204,23 +1324,51 @@ public class Graph {
         return C;
     }
 
+
 	public void maximum(final Matrix m1, final Matrix m2, final Matrix out) throws Exception {
 		
 		if (m1.rows != m2.rows || m1.cols != m2.cols) {
 			throw new Exception("matrix dimension mismatch");
 		}
-	
-		maximum(m1.size, m1.w, m2.w, out.w);
-
+		
+		
+		maximum(m1.size, m1.w, m2.w, m2.stepCache, out.w);
+		
 		if (this.applyBackprop) {
 			Runnable bp = new Runnable() {
 				public void run() {
-					maximumback(m1.size, m1.dw, m2.dw, out.dw);	
+					maximumback(m1.size, m1.dw, m2.dw, m2.stepCache, out.dw); 
+				}
+			};
+			backprop.add(bp);
+		}	
+	}
+
+	public Matrix maximum(final Matrix m1, final Matrix m2) throws Exception {
+		
+		if (m1.rows != m2.rows || m1.cols != m2.cols) {
+			throw new Exception("matrix dimension mismatch");
+		}
+		final Matrix out = new Matrix(m1.rows, m1.cols);
+		
+		maximum(m1.size, m1.w, m2.w, m2.stepCache, out.w);
+		
+		if (this.applyBackprop) {
+			Runnable bp = new Runnable() {
+				public void run() {
+					maximumback(m1.size, m1.dw, m2.dw, m2.stepCache, out.dw); 
 				}
 			};
 			backprop.add(bp);
 		}
-		
+		return out;
 	}
+	
+	
+    
+    
+    
+    
+
 	
 }

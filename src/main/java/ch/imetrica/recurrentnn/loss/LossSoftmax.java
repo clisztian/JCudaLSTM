@@ -15,7 +15,15 @@ import static jcuda.runtime.JCuda.cudaMalloc;
 import static jcuda.runtime.JCuda.cudaMemcpy;
 import static jcuda.runtime.cudaMemcpyKind.cudaMemcpyDeviceToHost;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+
+import ch.imetrica.recurrentnn.autodiff.Graph;
+import ch.imetrica.recurrentnn.datastructs.DataSequence;
+import ch.imetrica.recurrentnn.datastructs.DataStep;
 import ch.imetrica.recurrentnn.matrix.Matrix;
+import ch.imetrica.recurrentnn.model.Model;
+import ch.imetrica.recurrentnn.util.Util;
 import jcuda.Pointer;
 import jcuda.Sizeof;
 import jcuda.driver.CUcontext;
@@ -40,8 +48,8 @@ public class LossSoftmax implements Loss {
 
 	private cublasHandle handle;
 	
-	private CUmodule module; 
-	private CUfunction function;
+	public CUmodule module; 
+	public CUfunction function;
 	
 	int blockSizeX = 256;
 	
@@ -123,7 +131,7 @@ public class LossSoftmax implements Loss {
 //		return Util.median(ppls);
 //	}
 	
-	public Matrix getSoftmaxProbs(Matrix logprobs, double temperature) throws Exception {	
+	public static Matrix getSoftmaxProbs(CUfunction function, CUmodule module, Matrix logprobs, double temperature) throws Exception {	
 		
 		int maxIndx;
 		Matrix probs = new Matrix(logprobs.size);
@@ -136,7 +144,7 @@ public class LossSoftmax implements Loss {
 		maxIndx = JCublas.cublasIdamax(logprobs.size, logprobs.w, 1);
 		maxIndx = maxIndx - 1; 
 
-		normalize(logprobs.size, maxIndx, logprobs.w, probs.w);
+		normalize(function, module, logprobs.size, maxIndx, logprobs.w, probs.w);
 		double sum = JCudaReduction.reduce(probs.w, probs.size);
 		//double sum = JCublas.cublasDasum(probs.size,probs.w,1);
 		
@@ -144,6 +152,57 @@ public class LossSoftmax implements Loss {
 				
 		return probs;
 	}
+	
+	public static double[] getSoftmaxProbsv(CUfunction function, CUmodule module, Matrix logprobs, double temperature) throws Exception {	
+		
+		int maxIndx;
+	
+		temperature = 1.0/temperature;
+		
+		if (temperature != 1.0) {			
+			JCublas.cublasDscal(logprobs.size, temperature, logprobs.w,1);
+		}
+	
+		maxIndx = JCublas.cublasIdamax(logprobs.size, logprobs.w, 1);
+		maxIndx = maxIndx - 1; 
+
+		normalize(function, module, logprobs.size, maxIndx, logprobs.w, logprobs.stepCache);
+		double sum = JCudaReduction.reduce(logprobs.stepCache, logprobs.size);
+				
+		JCublas.cublasDscal(logprobs.size, (1.0/sum), logprobs.stepCache, 1);
+				
+		double[] probsv = new double[logprobs.size];
+		cudaMemcpy(Pointer.to(probsv), logprobs.stepCache, logprobs.size*Sizeof.DOUBLE,
+    	        cudaMemcpyDeviceToHost); 
+		
+		
+		return probsv;
+		
+	}
+	
+	
+	
+	public static void getSoftmaxProbs(CUfunction function, CUmodule module, Matrix logprobs, Matrix probs, double temperature) throws Exception {	
+		
+		int maxIndx;
+	
+		temperature = 1.0/temperature;
+		
+		if (temperature != 1.0) {			
+			JCublas.cublasDscal(logprobs.size, temperature, logprobs.w,1);
+		}
+	
+		maxIndx = JCublas.cublasIdamax(logprobs.size, logprobs.w, 1);
+		maxIndx = maxIndx - 1; 
+
+		normalize(function, module, logprobs.size, maxIndx, logprobs.w, probs.w);
+		double sum = JCudaReduction.reduce(probs.w, probs.size);
+		//double sum = JCublas.cublasDasum(probs.size,probs.w,1);
+		
+		JCublas.cublasDscal(probs.size, (1.0/sum), probs.w, 1);
+
+	}
+	
 	
     public void getSoftmaxProbsDW(Matrix logprobs, double temperature) throws Exception {	
 		
@@ -158,7 +217,7 @@ public class LossSoftmax implements Loss {
 		maxIndx = JCublas.cublasIdamax(logprobs.size, logprobs.w, 1);
 		maxIndx = maxIndx - 1; 
 
-		normalize(logprobs.size, maxIndx, logprobs.w, logprobs.dw);
+		normalize(function, module, logprobs.size, maxIndx, logprobs.w, logprobs.dw);
 		double sum = JCudaReduction.reduce(logprobs.dw, logprobs.size);
 		//double sum = JCublas.cublasDasum(probs.size,probs.w,1);
 		
@@ -174,7 +233,7 @@ public class LossSoftmax implements Loss {
     	int maxIndx = JCublas.cublasIdamax(logprobs.size, logprobs.w, 1);
 		maxIndx = maxIndx - 1; 
 		
-		normalize(logprobs.size, maxIndx, logprobs.w, w);
+		normalize(function, module, logprobs.size, maxIndx, logprobs.w, w);
 		double sum = JCudaReduction.reduce(w, logprobs.size);
 
 		return normalizeTarget(logprobs.size, sum, w, target);     	
@@ -246,7 +305,7 @@ public class LossSoftmax implements Loss {
         try{
         	
         	time0 = System.nanoTime();
-        	prob = loss.getSoftmaxProbs(mat, 2.0);        	
+        	prob = LossSoftmax.getSoftmaxProbs(loss.function, loss.module, mat, 2.0);        	
         	time1 = System.nanoTime();
             long durationComp = time1 - time0;
         	
@@ -307,12 +366,7 @@ public class LossSoftmax implements Loss {
 			e.printStackTrace();
 	    }
         
-        
-        
-        
-        
-        
-        
+       
         
         target.destroyMatrix();
 		mat.destroyMatrix();
@@ -355,7 +409,7 @@ public class LossSoftmax implements Loss {
 	 }
 	
 	
-	private void normalize(int size, int maxIndx, Pointer deviceInput, Pointer deviceOutput)
+	private static void normalize(CUfunction function, CUmodule module, int size, int maxIndx, Pointer deviceInput, Pointer deviceOutput)
 	{
 
 		    cuModuleGetFunction(function, module, "normalize");
@@ -379,31 +433,8 @@ public class LossSoftmax implements Loss {
             cuCtxSynchronize();
 	 }
 	
-//	private void targetIndex(int size, Pointer deviceInput, Pointer deviceOutput)
-//	{
-//		
-//		cuModuleGetFunction(function, module, "getTargetIndex");
-//	    Pointer kernelParameters = Pointer.to(
-//            Pointer.to(new int[]{size}),
-//            Pointer.to(deviceOutput),
-//            Pointer.to(deviceInput)    
-//        );
-//	
-//	    int blockSizeX = 256;
-//	    int gridSizeX = (size + blockSizeX - 1) / blockSizeX;
-//	    cuLaunchKernel(function,
-//            gridSizeX,  1, 1,      // Grid dimension
-//            blockSizeX, 1, 1,      // Block dimension
-//            0, null,               // Shared memory size and stream
-//            kernelParameters, null // Kernel- and extra parameters
-//        );
-//        cuCtxSynchronize();	
-//	}
-	
-	
-	
 
-    
+
     
     public static double measure(double[] logprobs, double[] targetOutput) 
     {
@@ -422,6 +453,7 @@ public class LossSoftmax implements Loss {
 		
 		return probs[targetIndex];
 	}
+    
     
 	public static double[] softmaxProbsHost(double[] w, double temperature)
 	{
@@ -461,6 +493,46 @@ public class LossSoftmax implements Loss {
 		}
 		return -1;		
 	}
+
+	
+	public double calculateMedianPerplexity(Model model, List<DataSequence> sequences) throws Exception {
+		
+		double temperature = 1.0;
+		List<Double> ppls = new ArrayList<>();
+		for (DataSequence seq : sequences) {
+			double n = 0;
+			double neglog2ppl = 0;
+			
+			Graph g = new Graph(false);
+			model.resetState();
+			for (DataStep step : seq.steps) {
+				
+				model.static_forward(step.input, g);
+				double[] probs = getSoftmaxProbsv(function, module, model.getOutput(), temperature);
+				
+				int targetIndex = getTargetIndex(getDoubleVector(step.targetOutput));
+				double probOfCorrect = probs[targetIndex];
+				double log2prob = Math.log(probOfCorrect)/Math.log(2); //change-of-base
+				
+				neglog2ppl += -log2prob;
+				n += 1;
+			}
+			
+			n -= 1; //don't count first symbol of sentence
+			double ppl = Math.pow(2, (neglog2ppl/(n-1)));
+			ppls.add(ppl);
+		}
+		return Util.median(ppls);
+	}
+
+	private double[] getDoubleVector(Matrix targetOutput) {
+		
+		double[] temp = new double[targetOutput.size];
+		cudaMemcpy(Pointer.to(temp), targetOutput.w, targetOutput.size*Sizeof.DOUBLE,
+    	        cudaMemcpyDeviceToHost); 
+		return null;
+	}
+	
 	
 	
 }

@@ -348,7 +348,7 @@ public class GruLayer implements Model {
 		
 		
 		int inputDimension = data.inputDimension;
-		int hiddenDimension = 12;
+		int hiddenDimension = 200;
 		int hiddenLayers = 1; 
 		int outputDimension = data.outputDimension; 
 		boolean applyTraining = true;

@@ -12,6 +12,7 @@ import ch.imetrica.recurrentnn.model.Model;
 import ch.imetrica.recurrentnn.model.NeuralNetwork;
 import ch.imetrica.recurrentnn.model.Nonlinearity;
 import ch.imetrica.recurrentnn.model.RnnLayer;
+import ch.imetrica.recurrentnn.model.RwaLayer;
 import jcuda.jcurand.curandGenerator;
 
 public class NeuralNetworkConstructor {
@@ -32,7 +33,23 @@ public class NeuralNetworkConstructor {
 		return new NeuralNetwork(layers);
 	}
 	
+	public static NeuralNetwork makeRwa(int inputDimension, int hiddenDimension, int inputCols, int hiddenLayers, int outputDimension, Nonlinearity decoderUnit, double initParamsStdDev, curandGenerator rng) {
+		List<Model> layers = new ArrayList<>();
+		for (int h = 0; h < hiddenLayers; h++) {
+			if (h == 0) {
+				layers.add(new RwaLayer(inputDimension, hiddenDimension, inputCols, initParamsStdDev, rng, h));
+			}
+			else {
+				layers.add(new RwaLayer(hiddenDimension, hiddenDimension, inputCols, initParamsStdDev, rng, h));
+			}
+		}
+		layers.add(new FeedForwardLayer(hiddenDimension, outputDimension, 1, decoderUnit, initParamsStdDev, rng, hiddenLayers+1));
+		return new NeuralNetwork(layers);
+	}
+	
+	
 	public static NeuralNetwork makeLstmWithInputBottleneck(int inputDimension, int bottleneckDimension, int hiddenDimension, int inputCols, int hiddenLayers, int outputDimension, Nonlinearity decoderUnit, double initParamsStdDev, curandGenerator rng) {
+		
 		List<Model> layers = new ArrayList<>();
 		layers.add(new LinearLayer(inputDimension, bottleneckDimension, inputCols, initParamsStdDev, rng));
 		for (int h = 0; h < hiddenLayers; h++) {

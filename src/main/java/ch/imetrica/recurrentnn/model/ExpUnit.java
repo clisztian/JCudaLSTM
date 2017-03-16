@@ -40,17 +40,16 @@ public class ExpUnit implements Nonlinearity {
 	        "    int i = blockIdx.x * blockDim.x + threadIdx.x;" + "\n" +
 	        "    if (i<n)" + "\n" +
 	        "    {" + "\n" +
-	        "        out[i] = exp(-a[i]);" + "\n" +
+	        "        out[i] = exp(a[i]);" + "\n" +
 	        "    }" + "\n" +
 	        "}" + "\n" + "\n" + 
 	        "extern \"C\"" + "\n" +
 	        "__global__ void backwardexp(int n, double *a, double *out)" + "\n" +
 	        "{" + "\n" +
 	        "    int i = blockIdx.x * blockDim.x + threadIdx.x;" + "\n" +
-	        "    double act = 0.0;" + "\n" +
 	        "    if (i<n)" + "\n" +
 	        "    {" + "\n" +
-	        "        out[i] = -exp(-a[i]);" + "\n" +
+	        "        out[i] = exp(a[i]);" + "\n" +
 	        "    }" + "\n" +
 	        "}" + "\n";	
 	

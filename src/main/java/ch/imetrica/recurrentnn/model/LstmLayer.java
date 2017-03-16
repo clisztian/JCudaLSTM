@@ -460,7 +460,7 @@ public class LstmLayer implements Model {
 		
 		
 		int inputDimension = data.inputDimension;
-		int hiddenDimension = 12;
+		int hiddenDimension = 250;
 		int hiddenLayers = 1; 
 		int outputDimension = data.outputDimension; 
 		boolean applyTraining = true;
