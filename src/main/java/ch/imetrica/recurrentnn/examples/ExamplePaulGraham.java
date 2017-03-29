@@ -7,6 +7,7 @@ import static jcuda.jcurand.curandRngType.CURAND_RNG_PSEUDO_DEFAULT;
 import java.util.Random;
 
 import ch.imetrica.recurrentnn.datasets.TextGeneration;
+import ch.imetrica.recurrentnn.datastructs.DataSequence;
 import ch.imetrica.recurrentnn.datastructs.DataSet;
 import ch.imetrica.recurrentnn.model.NeuralNetwork;
 import ch.imetrica.recurrentnn.trainer.Trainer;
@@ -35,19 +36,31 @@ public class ExamplePaulGraham {
 		TextGeneration.reportSequenceLength = 100;
 		TextGeneration.singleWordAutocorrect = false; //set this to true to constrain generated sentences to contain only words observed in the training data.
 
+		
+//		for (DataSequence seq : data.training) {
+//		System.out.println(seq.toString());}
+		
+		
 		int bottleneckSize = 10; //one-hot input is squeezed through this
-		int hiddenDimension = 200;
+		int hiddenDimension = 100;
 		int hiddenLayers = 1;
 		double learningRate = 0.001;
 		double initParamsStdDev = 0.08;
 		
 		Random r = new Random();
 		
-		NeuralNetwork lstm = NeuralNetworkConstructor.makeLstmWithInputBottleneck( 
-				data.inputDimension, bottleneckSize, 
+		NeuralNetwork lstm = NeuralNetworkConstructor.makeLstm( 
+				data.inputDimension, 
 				hiddenDimension, 1, hiddenLayers, 
 				data.outputDimension, data.getModelOutputUnitToUse(), 
 				initParamsStdDev, rng);
+		
+		
+//		NeuralNetwork lstm = NeuralNetworkConstructor.makeLstmWithInputBottleneck( 
+//				data.inputDimension, bottleneckSize, 
+//				hiddenDimension, 1, hiddenLayers, 
+//				data.outputDimension, data.getModelOutputUnitToUse(), 
+//				initParamsStdDev, rng);
 		
 		int reportEveryNthEpoch = 10;
 		int trainingEpochs = 1000;

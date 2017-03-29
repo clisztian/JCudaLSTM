@@ -1,6 +1,5 @@
 package ch.imetrica.recurrentnn.model;
 
-
 import static jcuda.driver.JCudaDriver.cuCtxCreate;
 import static jcuda.driver.JCudaDriver.cuCtxSynchronize;
 import static jcuda.driver.JCudaDriver.cuDeviceGet;
@@ -24,7 +23,6 @@ import java.util.List;
 import java.util.Random;
 
 import ch.imetrica.recurrentnn.autodiff.Graph;
-import ch.imetrica.recurrentnn.datasets.EmbeddedReberGrammar;
 import ch.imetrica.recurrentnn.datasets.TextGeneration;
 import ch.imetrica.recurrentnn.datastructs.DataSequence;
 import ch.imetrica.recurrentnn.datastructs.DataSet;
@@ -44,7 +42,7 @@ import jcuda.nvrtc.nvrtcProgram;
 
 
 
-public class LstmLayer implements Model {
+public class BNLstmLayer implements Model {
 	
 	private static final long serialVersionUID = 1L;
 	int inputDimension;
@@ -59,7 +57,8 @@ public class LstmLayer implements Model {
 	Matrix Wfx, Wfh, bf;
 	Matrix Wox, Woh, bo;
 	Matrix Wcx, Wch, bc;
-	
+	Matrix gammah, betah;
+	Matrix gammax, betax;
 
 	Matrix hiddenContent;
 	Matrix cellContent;
@@ -114,7 +113,7 @@ public class LstmLayer implements Model {
 	
 	
 	
-	public LstmLayer(int inputDimension, int outputDimension, int nbatch, double initParamsStdDev, curandGenerator rng, int seed) {
+	public BNLstmLayer(int inputDimension, int outputDimension, int nbatch, double initParamsStdDev, curandGenerator rng, int seed) {
 		
 		curandSetPseudoRandomGeneratorSeed(rng, seed);
 		prepareCuda();
@@ -161,7 +160,7 @@ public class LstmLayer implements Model {
 
 	
 	
-	public LstmLayer() {
+	public BNLstmLayer() {
 		// TODO Auto-generated constructor stub
 	}
 
@@ -415,10 +414,10 @@ public class LstmLayer implements Model {
 		
 		for (int h = 0; h < hiddenLayers; h++) {
 			if (h == 0) {
-				layers.add(new LstmLayer(inputDimension, hiddenDimension, inputCols, initParamsStdDev, rng, h));
+				layers.add(new BNLstmLayer(inputDimension, hiddenDimension, inputCols, initParamsStdDev, rng, h));
 			}
 			else {
-				layers.add(new LstmLayer(hiddenDimension, hiddenDimension, inputCols, initParamsStdDev, rng, h));
+				layers.add(new BNLstmLayer(hiddenDimension, hiddenDimension, inputCols, initParamsStdDev, rng, h));
 			}
 		}
 		layers.add(new FeedForwardLayer(hiddenDimension, outputDimension, 1, decoderUnit, initParamsStdDev, rng, hiddenLayers+1));
@@ -678,7 +677,7 @@ public class LstmLayer implements Model {
         curandSetPseudoRandomGeneratorSeed(rng, 1234);
 		
         
-        LstmLayer lstm = new LstmLayer();
+        BNLstmLayer lstm = new BNLstmLayer();
         
         try {
         	
@@ -839,3 +838,4 @@ public class LstmLayer implements Model {
 	}
 	
 }
+

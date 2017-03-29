@@ -149,6 +149,7 @@ public class Trainer {
 					double loss = lossReporting.measure(model.getOutput(), step.targetOutput);	
 					
 
+					System.out.println("Loss = " + loss);
 									
 					if (Double.isNaN(loss) || Double.isInfinite(loss)) {
 						return loss;
@@ -156,16 +157,16 @@ public class Trainer {
 					numerLoss += loss;
 					denomLoss++;			
 					if (applyTraining) {
-						
 						lossTraining.backward(model.getOutput(), step.targetOutput);
-
 					}
 				}
 			}
 			if (applyTraining) {
 				g.backward(); //backprop dw values
 				updateModelParams(model, learningRate); //update params
-			}	
+			}
+			
+			model.getOutput().printMatrix();
 		}
 		return numerLoss/denomLoss;
 	}

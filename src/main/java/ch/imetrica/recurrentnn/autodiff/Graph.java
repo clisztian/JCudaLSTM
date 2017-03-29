@@ -109,6 +109,30 @@ public class Graph {
 	        "    }" + "\n" +
 	        "}" + "\n\n" + 
 	        "extern \"C\"" + "\n" +
+	        "__global__ void addbatch(int nrows, int nbatch, double *m1, double *m2, double *outdw)" + "\n" +
+	        "{" + "\n" +
+	        "    int i = blockIdx.x*blockDim.x + threadIdx.x;" + "\n" +
+	        "    int j = blockIdx.y*blockDim.y + threadIdx.y;" + "\n" +
+	        "    if (i<nrows && j < nbatch)" + "\n" +
+	        "    {" + "\n" +
+	        "        outdw[i*nbatch + j] = m1[i*nbatch + j] + m2[i];" + "\n" +
+	        "    }" + "\n" +
+	        "}" + "\n\n" + 
+	        "__global__ void addbatchback(int nrows, int nbatch, double *m1, double *m2, double *outdw)" + "\n" +
+	        "{" + "\n" +
+	        "    int i = blockIdx.x*blockDim.x + threadIdx.x;" + "\n" +
+	        "    int j = blockIdx.y*blockDim.y + threadIdx.y;" + "\n" +
+	        "    if (i<nrows && j < nbatch)" + "\n" +
+	        "    {" + "\n" +
+	        "        m1[i*nbatch + j] = m1[i*nbatch + j] + outdw[i*nbatch + j];" + "\n" +
+	        "                                                                  " + "\n" + 
+	        "    }" + "\n" +
+	        "}" + "\n\n" + 
+	        
+	        
+	        
+	        
+	        "extern \"C\"" + "\n" +
 	        "__global__ void sub(int n, double *m1, double *m2, double *outdw)" + "\n" +
 	        "{" + "\n" +
 	        "    int i = blockIdx.x * blockDim.x + threadIdx.x;" + "\n" +
@@ -447,6 +471,27 @@ public class Graph {
 			backprop.add(bp);
 		}
 	}	
+	
+	public void addbatch(final Matrix m1, final Matrix m2, final Matrix out) throws Exception {
+		if (m1.rows != m2.rows) {
+			throw new Exception("matrix dimension mismatch");
+		}
+		eleadd(out.size, m1.w, m2.w, out.w);
+		
+		if (this.applyBackprop) {
+			Runnable bp = new Runnable() {
+				public void run() {
+					
+					Pointer one = Pointer.to(new double[]{ 1.0 });
+									
+					cublasDaxpy(handle, m1.size, one, out.dw, 1, m1.dw, 1);
+					cublasDaxpy(handle, m2.size, one, out.dw, 1, m2.dw, 1);					
+				}
+			};
+			backprop.add(bp);
+		}
+	}	
+	
 	
 	
 	public Matrix elmul(final Matrix m1, final Matrix m2) throws Exception {
