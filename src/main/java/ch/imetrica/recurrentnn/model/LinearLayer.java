@@ -102,13 +102,20 @@ public class LinearLayer implements Model {
 	@Override
 	public void resetState() {
 
-		for(int i = 0; i < linearCell.size(); i++)
-		{
-			linearCell.get(i).resetCell(function, module);
-		}
+		destroyCells();
 		nsteps = 0;	
 	}
 
+	public void destroyCells()
+	{		
+		for(int i = 0; i < linearCell.size(); i++)
+		{
+			linearCell.get(i).destroycell();
+		}
+		linearCell.clear();
+	}
+	
+	
 	@Override
 	public List<Matrix> getParameters() {
 		List<Matrix> result = new ArrayList<>();

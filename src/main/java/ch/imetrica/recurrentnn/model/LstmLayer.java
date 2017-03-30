@@ -213,6 +213,8 @@ public class LstmLayer implements Model {
 		if(nsteps == lstmCells.size()) {
 			lstmCells.add(LstmCell.zeros(inputDimension, outputDimension, nbatch));
 		}
+		
+	
 					
 		g.mul(Wix, input, lstmCells.get(nsteps).outmul0);
 		g.mul(Wih, hiddenContent, lstmCells.get(nsteps).outmul1);
@@ -220,6 +222,9 @@ public class LstmLayer implements Model {
 		g.add(lstmCells.get(nsteps).outadd0, bi, lstmCells.get(nsteps).outadd1);
 		g.nonlin(fInputGate, lstmCells.get(nsteps).outadd1, lstmCells.get(nsteps).outinputGate);
 	
+		
+		
+		
 		g.mul(Wfx, input, lstmCells.get(nsteps).outmul2);
 		g.mul(Wfh, hiddenContent, lstmCells.get(nsteps).outmul3);
 		g.add(lstmCells.get(nsteps).outmul2, lstmCells.get(nsteps).outmul3, lstmCells.get(nsteps).outadd2);
@@ -245,10 +250,13 @@ public class LstmLayer implements Model {
 		g.nonlin(fCellOutput, lstmCells.get(nsteps).cellAct, lstmCells.get(nsteps).outnonlin);				
 		g.elmul(lstmCells.get(nsteps).outputGate, lstmCells.get(nsteps).outnonlin, lstmCells.get(nsteps).output);
 				
+		//lstmCells.get(nsteps).output.printMatrix();
 
 		hiddenContent = lstmCells.get(nsteps).output;
 		cellContent = lstmCells.get(nsteps).cellAct;
 
+		//cellContent.printMatrix();
+		
 		nsteps++;
 	}
 		
@@ -335,18 +343,18 @@ public class LstmLayer implements Model {
 	
 	@Override
 	public void resetState() {
-		
-		
-		
+			
 		resetToZero(hidden0);
 		resetToZero(cell0);
 		
 		hiddenContent = hidden0;
 		cellContent = cell0;
-				
-		for(int i = 0; i < lstmCells.size(); i++) {
-			lstmCells.get(i).resetCell(function, module);
-		}
+
+		destroyCells();
+		
+//		for(int i = 0; i < lstmCells.size(); i++) {
+//			lstmCells.get(i).resetCell(function, module);
+//		}
 		nsteps = 0;		
 		
 	}
@@ -408,6 +416,15 @@ public class LstmLayer implements Model {
 		
 	}
 	
+	public void destroyCells()
+	{		
+		for(int i = 0; i < lstmCells.size(); i++)
+		{	
+		  lstmCells.get(i).destroycell();
+		}	
+		lstmCells.clear();
+	}
+	
 	
 	public static List<Model> makeLstm(int inputDimension, int hiddenDimension, int inputCols, int hiddenLayers, int outputDimension, Nonlinearity decoderUnit, double initParamsStdDev, curandGenerator rng) {
 		
@@ -466,7 +483,7 @@ public class LstmLayer implements Model {
 		
 		
 		int inputDimension = data.inputDimension;
-		int hiddenDimension = 100;
+		int hiddenDimension = 250;
 		int hiddenLayers = 1; 
 		int outputDimension = data.outputDimension; 
 		boolean applyTraining = true;
@@ -508,15 +525,13 @@ public class LstmLayer implements Model {
 			
 		  for (DataSequence seq : data.training) {
 			
-		  
-			  
+
 			LSTMNet.resetState();
 			g.emptyBackpropQueue();
 			
 			
 			for (DataStep step : seq.steps) {
-				
-				
+
 				LSTMNet.forward_ff(step.input, g);
 				
 				if (step.targetOutput != null) {
@@ -534,6 +549,7 @@ public class LstmLayer implements Model {
 						lossTraining.backward(LSTMNet.getOutput(), step.targetOutput);
 					}
 				}
+				
 				
 			}
 			if(numerLoss/denomLoss == 0) {break;}

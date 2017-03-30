@@ -68,7 +68,7 @@ public class LossSumOfSquares implements Loss {
 		double sum = 0;
 		difference(actualOutput.size, actualOutput.w, targetOutput.w, targetOutput.stepCache);
 		sum = JCublas.cublasDnrm2(targetOutput.size, targetOutput.stepCache, 1);
-		return .5*sum*sum;
+		return .5*sum*sum/targetOutput.cols;
 
 	}
 	

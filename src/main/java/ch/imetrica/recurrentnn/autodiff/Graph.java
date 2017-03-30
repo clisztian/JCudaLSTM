@@ -24,6 +24,7 @@ import static jcuda.jcublas.JCublas2.cublasDaxpy;
 import static jcuda.jcublas.JCublas2.cublasGetVector;
 import static jcuda.jcublas.JCublas2.cublasSetVector;
 import static jcuda.runtime.cudaMemcpyKind.cudaMemcpyDeviceToHost;
+import static jcuda.runtime.cudaMemcpyKind.cudaMemcpyHostToDevice;
 import static jcuda.jcublas.cublasOperation.CUBLAS_OP_N;
 import static jcuda.jcublas.cublasOperation.CUBLAS_OP_T;
 import java.util.ArrayList;
@@ -61,6 +62,7 @@ public class Graph {
 	private CUfunction function;
 	
 	int blockSizeX = 100;
+	int blockSizeY = 100;
 	
 	private static String updateSourceCode = 
 			
@@ -113,22 +115,36 @@ public class Graph {
 	        "{" + "\n" +
 	        "    int i = blockIdx.x*blockDim.x + threadIdx.x;" + "\n" +
 	        "    int j = blockIdx.y*blockDim.y + threadIdx.y;" + "\n" +
-	        "    if (i<nrows && j < nbatch)" + "\n" +
+	        "    if (i<nrows)" + "\n" +
 	        "    {" + "\n" +
+	        "      if(j < nbatch)" + "\n" +
+	        "      {" + "\n" +
 	        "        outdw[i*nbatch + j] = m1[i*nbatch + j] + m2[i];" + "\n" +
+	        "      }" + "\n" +
 	        "    }" + "\n" +
 	        "}" + "\n\n" + 
+	        "extern \"C\"" + "\n" +
 	        "__global__ void addbatchback(int nrows, int nbatch, double *m1, double *m2, double *outdw)" + "\n" +
 	        "{" + "\n" +
 	        "    int i = blockIdx.x*blockDim.x + threadIdx.x;" + "\n" +
 	        "    int j = blockIdx.y*blockDim.y + threadIdx.y;" + "\n" +
-	        "    if (i<nrows && j < nbatch)" + "\n" +
+	        "    if (i < nrows)" + "\n" +
 	        "    {" + "\n" +
+	        "      if(j < nbatch)" + "\n" +
+	        "      {" + "\n" +
 	        "        m1[i*nbatch + j] = m1[i*nbatch + j] + outdw[i*nbatch + j];" + "\n" +
-	        "                                                                  " + "\n" + 
+	        "      }" + "\n" +
 	        "    }" + "\n" +
-	        "}" + "\n\n" + 
-	        
+	        "}" + "\n\n" +
+	        "extern \"C\"" + "\n" +
+	        "__global__ void addbatchbackrow(int nrows, int nbatch, int col, double *m1, double *m2, double *outdw)" + "\n" +
+	        "{" + "\n" +
+	        "    int i = blockIdx.x*blockDim.x + threadIdx.x;" + "\n" +
+	        "    if (i < nrows)" + "\n" +
+	        "    {" + "\n" +
+	        "        m2[i] +=  outdw[i*nbatch + col]/nbatch;" + "\n" + 
+	        "    }" + "\n" +
+	        "}" + "\n\n" +   
 	        
 	        
 	        
@@ -141,6 +157,7 @@ public class Graph {
 	        "        outdw[i] = m1[i] - m2[i];" + "\n" +
 	        "    }" + "\n" +
 	        "}" + "\n\n" + 
+	        "extern \"C\"" + "\n" +
 	        "__global__ void subback(int n, double *m1dw, double *m2dw, double *outdw)" + "\n" +
 	        "{" + "\n" +
 	        "    int i = blockIdx.x * blockDim.x + threadIdx.x;" + "\n" +
@@ -476,16 +493,19 @@ public class Graph {
 		if (m1.rows != m2.rows) {
 			throw new Exception("matrix dimension mismatch");
 		}
-		eleadd(out.size, m1.w, m2.w, out.w);
+		eleaddbatch(out.rows, out.cols, m1.w, m2.w, out.w);
 		
 		if (this.applyBackprop) {
 			Runnable bp = new Runnable() {
-				public void run() {
+				public void run() {		
 					
-					Pointer one = Pointer.to(new double[]{ 1.0 });
-									
+					Pointer one = Pointer.to(new double[]{ 1.0 });					
 					cublasDaxpy(handle, m1.size, one, out.dw, 1, m1.dw, 1);
-					cublasDaxpy(handle, m2.size, one, out.dw, 1, m2.dw, 1);					
+					
+					for(int i = 0; i < out.cols; i++) {
+					  eleaddback(out.rows, out.cols, i, m1.dw, m2.dw, out.dw);
+					}
+					//m2.printMatrixDW();
 				}
 			};
 			backprop.add(bp);
@@ -761,6 +781,57 @@ public class Graph {
 	    cuCtxSynchronize();		
 	}
 
+	
+	public void eleaddbatch(int n, int nbatch, Pointer a, Pointer b, Pointer out) 
+	{
+		cuModuleGetFunction(function, module, "addbatch");
+		Pointer kernelParameters = Pointer.to(
+                Pointer.to(new int[]{n}),
+                Pointer.to(new int[]{nbatch}),
+                Pointer.to(a),
+                Pointer.to(b),
+                Pointer.to(out)
+        );
+		
+		int gridSizeX = (n + 1 - 1) / 1;
+		int gridSizeY = (nbatch + 1 - 1) / 1;
+		cuLaunchKernel(function,
+	            gridSizeX,  gridSizeY, 1,      // Grid dimension
+	            blockSizeX, 1, 1,      // Block dimension
+	            0, null,               // Shared memory size and stream
+	            kernelParameters, null // Kernel- and extra parameters
+	        );
+	    cuCtxSynchronize();		
+	}
+	
+	
+
+	
+	
+	public void eleaddback(int n, int nbatch, int col, Pointer a, Pointer b, Pointer out) 
+	{
+		cuModuleGetFunction(function, module, "addbatchbackrow");
+		Pointer kernelParameters = Pointer.to(
+                Pointer.to(new int[]{n}),
+                Pointer.to(new int[]{nbatch}),
+                Pointer.to(new int[]{col}),
+                Pointer.to(a),
+                Pointer.to(b),
+                Pointer.to(out)
+        );
+		
+		int gridSizeX = (n + blockSizeX - 1) / blockSizeX;
+		cuLaunchKernel(function,
+	            gridSizeX,  1, 1,      // Grid dimension
+	            blockSizeX, 1, 1,      // Block dimension
+	            0, null,               // Shared memory size and stream
+	            kernelParameters, null // Kernel- and extra parameters
+	        );
+	    cuCtxSynchronize();		
+	}
+	
+	
+	
 	public void elesub(int n, Pointer a, Pointer b, Pointer out) 
 	{
 		cuModuleGetFunction(function, module, "sub");
@@ -952,10 +1023,50 @@ public class Graph {
 		Graph g = new Graph();
 		
 		
-		boolean test_multiplication = true;
+		boolean test_multiplication = false;
 		boolean test_nonlinear = false;
+		boolean test_batchadd = true;
 		
-		if(test_multiplication)
+		
+		if(test_batchadd)
+		{
+			
+			Matrix mat1 = Matrix.zeros(10, 5);
+			Matrix mat2 = Matrix.rand(10, 1, 1.0, generator);
+			Matrix out = Matrix.zeros(10, 5);
+			
+			try {
+				
+				g.addbatch(mat1, mat2, out);
+				
+				out.printMatrix();
+				
+				double hostData[] = new double[out.size];
+			    Arrays.fill(hostData,  3.0);
+				
+			    cudaMemcpy(out.dw, Pointer.to(hostData), out.size * Sizeof.DOUBLE,
+				        cudaMemcpyHostToDevice); 
+			    
+				g.backward();
+				
+				
+				mat1.printMatrixDW();
+				mat2.printMatrixDW();
+				
+				
+				
+				mat1.destroyMatrix();
+				mat2.destroyMatrix(); 
+				out.destroyMatrix();  
+				
+				
+			} catch (Exception e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+			
+		}		
+		else if(test_multiplication)
 		{
 		
 			Matrix out;
@@ -1014,7 +1125,7 @@ public class Graph {
 			}
 			
 		}
-		if(test_nonlinear)
+		else if(test_nonlinear)
 		{
 		
 		

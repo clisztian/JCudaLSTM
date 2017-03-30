@@ -94,7 +94,7 @@ public class FeedForwardLayer implements Model {
 		
 		curandSetPseudoRandomGeneratorSeed(rng, seed);
 		W = Matrix.rand(outputDimension, inputDimension, initParamsStdDev, rng);
-		b = Matrix.zeros(outputDimension, nbatch);
+		b = Matrix.zeros(outputDimension, 1);
 		this.f = f;
 
 		
@@ -134,13 +134,21 @@ public class FeedForwardLayer implements Model {
 	@Override
 	public void static_forward(Matrix input, Graph g) throws Exception {
 		
+		//System.out.println("nsteps = " + nsteps + " " + ffCell.size());
+		
 		if(nsteps == ffCell.size()) {
 			ffCell.add(FFCell.zeros(inputDimension, outputDimension, b.cols));
 		}
 		
+		
+		
 		g.mul(W, input, ffCell.get(nsteps).outmul);  
-		g.add(ffCell.get(nsteps).outmul, b, ffCell.get(nsteps).outsum);
+		g.addbatch(ffCell.get(nsteps).outmul, b, ffCell.get(nsteps).outsum);
+		//ffCell.get(nsteps).outsum.printMatrix();
+		
 		g.nonlin(f, ffCell.get(nsteps).outsum, ffCell.get(nsteps).outnonlin);	
+		
+		
 		
 		nsteps++;
 	}	
@@ -173,6 +181,7 @@ public class FeedForwardLayer implements Model {
 	@Override
 	public void resetState() {
 
+	   //destroyCells();
 	   for(int i = 0; i < ffCell.size(); i++)
 	   {
 		ffCell.get(i).resetCell(function, module);
@@ -180,6 +189,17 @@ public class FeedForwardLayer implements Model {
 	   nsteps = 0;
 	}
 
+	
+	public void destroyCells()
+	{		
+		for(int i = 0; i < ffCell.size(); i++)
+		{
+			ffCell.get(i).destroycell();
+		}
+		ffCell.clear();
+	}
+	
+	
 	@Override
 	public List<Matrix> getParameters() {
 		List<Matrix> result = new ArrayList<>();
@@ -259,8 +279,8 @@ public class FeedForwardLayer implements Model {
 	public static void printParameters(List<FeedForwardLayer> layers)
 	{
 		for (FeedForwardLayer layer : layers) {			
-			System.out.println("Print layer's b parameter:");
-			layer.b.printMatrix();
+			System.out.println("Print layer's W parameter:");
+			layer.W.printMatrix();
 		}
 	}
 
@@ -272,8 +292,6 @@ public class FeedForwardLayer implements Model {
 			layers.get(i).static_forward(layers.get(i-1).getOutput(), g);
 		}
 	}
-	
-
 	
 	public static void resetState(List<FeedForwardLayer> layers)
 	{
@@ -299,7 +317,7 @@ public class FeedForwardLayer implements Model {
 		double numerLoss = 0;
 		double denomLoss = 0;
 		
-		double stepSize = .005; 
+		double stepSize = .001; 
 		double decayRate = 0.999;
 		double smoothEpsilon = 1e-8;
 		double gradientClipValue = 5;
@@ -308,7 +326,7 @@ public class FeedForwardLayer implements Model {
 		
 	
 		int inputDimension = 1;
-		int hiddenDimension = 50;
+		int hiddenDimension = 10;
 		int hiddenLayers = 1; 
 		int outputDimension = 1; 
 		boolean applyTraining = true;
@@ -363,7 +381,7 @@ public class FeedForwardLayer implements Model {
 				
 				if (step.targetOutput != null) {
 					
-					double loss = lossReporting.measure(getOutput(feedForwardNet), step.targetOutput);					
+					double loss = lossReporting.measure(getOutput(feedForwardNet), step.targetOutput);				
 					if (Double.isNaN(loss) || Double.isInfinite(loss)) {
 						
 						throw new RuntimeException("Could not converge");
@@ -387,7 +405,7 @@ public class FeedForwardLayer implements Model {
 		  if(i%10 == 0) {
 			  System.out.println("Epoch " + i + " average loss = " + numerLoss/denomLoss);
 			  
-			  printParameters(feedForwardNet);
+			  //printParameters(feedForwardNet);
 		  }
 		}
 		
@@ -495,7 +513,7 @@ public class FeedForwardLayer implements Model {
 		double gradientClipValue = 5;
 		double regularization = 0.000001; 
 		
-		int nbatch = 10;
+		int nbatch = 1;
 		int inputDimension = 200;
 		int outputDimension = 100;
 		double initParamsStdDev = 0.08;
@@ -596,7 +614,7 @@ public class FeedForwardLayer implements Model {
 		   curandCreateGenerator(generator, CURAND_RNG_PSEUDO_DEFAULT);
 		   curandSetPseudoRandomGeneratorSeed(generator, 1);
 		   
-		   int nbatch = 5;
+		   int nbatch = 10;
 
 		   try{
 			   
@@ -625,9 +643,7 @@ public class FeedForwardLayer implements Model {
 		   catch (Exception e) {
 				e.printStackTrace();
 		   }   
-		   
-	   }
-		
+	   }		
     }
 
 	@Override

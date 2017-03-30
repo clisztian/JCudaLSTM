@@ -44,23 +44,23 @@ public class ExamplePaulGraham {
 		int bottleneckSize = 10; //one-hot input is squeezed through this
 		int hiddenDimension = 100;
 		int hiddenLayers = 1;
-		double learningRate = 0.001;
+		double learningRate = 0.002;
 		double initParamsStdDev = 0.08;
 		
 		Random r = new Random();
 		
-		NeuralNetwork lstm = NeuralNetworkConstructor.makeLstm( 
-				data.inputDimension, 
-				hiddenDimension, 1, hiddenLayers, 
-				data.outputDimension, data.getModelOutputUnitToUse(), 
-				initParamsStdDev, rng);
-		
-		
-//		NeuralNetwork lstm = NeuralNetworkConstructor.makeLstmWithInputBottleneck( 
-//				data.inputDimension, bottleneckSize, 
+//		NeuralNetwork lstm = NeuralNetworkConstructor.makeLstm( 
+//				data.inputDimension, 
 //				hiddenDimension, 1, hiddenLayers, 
 //				data.outputDimension, data.getModelOutputUnitToUse(), 
 //				initParamsStdDev, rng);
+		
+		
+		NeuralNetwork lstm = NeuralNetworkConstructor.makeLstmWithInputBottleneck( 
+				data.inputDimension, bottleneckSize, 
+				hiddenDimension, 1, hiddenLayers, 
+				data.outputDimension, data.getModelOutputUnitToUse(), 
+				initParamsStdDev, rng);
 		
 		int reportEveryNthEpoch = 10;
 		int trainingEpochs = 1000;

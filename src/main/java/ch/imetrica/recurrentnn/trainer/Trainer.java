@@ -147,10 +147,7 @@ public class Trainer {
 				if (step.targetOutput != null) {
 					
 					double loss = lossReporting.measure(model.getOutput(), step.targetOutput);	
-					
-
-					System.out.println("Loss = " + loss);
-									
+								
 					if (Double.isNaN(loss) || Double.isInfinite(loss)) {
 						return loss;
 					}
@@ -166,7 +163,7 @@ public class Trainer {
 				updateModelParams(model, learningRate); //update params
 			}
 			
-			model.getOutput().printMatrix();
+			//model.getOutput().printMatrix();
 		}
 		return numerLoss/denomLoss;
 	}

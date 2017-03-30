@@ -1298,10 +1298,11 @@ public class Matrix implements Serializable {
         	for(int j = 0; j < this.cols; j++)
             {	
         	//System.out.println(i + " " + hostOutputW[i] + " " + hostInput[i] + " " + hostCached[i]);
-        	  System.out.print(hostOutputW[j*this.rows + i] + ", ");
+        	  System.out.print(hostOutputW[i*this.cols + j] + ", ");
             }
+        	System.out.println("");
         }
-        System.out.println("");
+        
     }
     
     public void printMatrixDW() {
@@ -1315,8 +1316,9 @@ public class Matrix implements Serializable {
         	for(int j = 0; j < this.cols; j++)
             {	
         	//System.out.println(i + " " + hostOutputW[i] + " " + hostInput[i] + " " + hostCached[i]);
-        	  System.out.print(hostOutputW[j*this.rows + i] + ", ");
+        		System.out.print(hostOutputW[i*this.cols + j] + ", ");
             }
+        	System.out.println("");
         }
         System.out.println("");
     }

@@ -530,7 +530,7 @@ public class LossSoftmax implements Loss {
 		double[] temp = new double[targetOutput.size];
 		cudaMemcpy(Pointer.to(temp), targetOutput.w, targetOutput.size*Sizeof.DOUBLE,
     	        cudaMemcpyDeviceToHost); 
-		return null;
+		return temp;
 	}
 	
 	
